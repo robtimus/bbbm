@@ -1,6 +1,11 @@
 bbbm ChangeLog
 ----------------------------------------
 
+0.3.1
+-----
+ - Improved file manager behaviour; makes it easier to jump to directories just
+   by typing the name (with thanks to Jari Aalto)
+
 0.3
 ---
  - Complete rewrite in C (which should make bbbm1 redundant)

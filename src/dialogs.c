@@ -41,6 +41,7 @@ void bbbm_options_dialog(BBBM *bbbm)
                                          GTK_STOCK_CANCEL, GTK_RESPONSE_CANCEL,
                                          NULL);
     frame = gtk_frame_new("Commands");
+    gtk_container_set_border_width(GTK_CONTAINER(frame), 5);
     table = gtk_table_new(2, 2, TRUE);
     label = gtk_label_new("Set command:");
     gtk_widget_show(label);
@@ -63,6 +64,7 @@ void bbbm_options_dialog(BBBM *bbbm)
                        TRUE, TRUE, 0);
 
     frame = gtk_frame_new("Thumbnails");
+    gtk_container_set_border_width(GTK_CONTAINER(frame), 5);
     table = gtk_table_new(2, 2, TRUE);
     label = gtk_label_new("Thumbnail size:");
     gtk_widget_show(label);
@@ -145,6 +147,7 @@ void bbbm_move_dialog(BBBMImage *image, gint index, gboolean forward)
                                          GTK_STOCK_CANCEL, GTK_RESPONSE_CANCEL,
                                          NULL);
     frame = gtk_frame_new(title);
+    gtk_container_set_border_width(GTK_CONTAINER(frame), 5);
     table = gtk_table_new(1, 2, TRUE);
     label = gtk_label_new("Moving step:");
     gtk_widget_show(label);
@@ -183,6 +186,7 @@ void bbbm_edit_description_dialog(BBBMImage *image)
                                          GTK_STOCK_CANCEL, GTK_RESPONSE_CANCEL,
                                          NULL);
     frame = gtk_frame_new("Description");
+    gtk_container_set_border_width(GTK_CONTAINER(frame), 5);
     table = gtk_table_new(2, 1, TRUE);
     label = gtk_label_new("Description:");
     gtk_widget_show(label);
