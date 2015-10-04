@@ -1,6 +1,11 @@
 bbbm ChangeLog
 ----------------------------------------
 
+0.6.1
+-----
+ - Fixed a bug that caused bbbm to crash when trying to open or add an
+   unreadable collection
+
 0.6
 ---
  - Changed creation of images; instead of using external ImageMagick command,

@@ -376,7 +376,7 @@ static gboolean bbbm_add_collection0(BBBM *bbbm, const gchar *filename)
 
     gchar file[PATH_MAX], desc[PATH_MAX];
     FILE *f = fopen(filename, "r");
-    if (!file)
+    if (!f)
         return FALSE;
     while (fgets(file, PATH_MAX, f))
     {
