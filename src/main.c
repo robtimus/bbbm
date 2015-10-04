@@ -19,20 +19,18 @@
  */
 
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
-#include <getopt.h>
+#include <stdlib.h>
+#include <errno.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
+#include <getopt.h>
 #include <gtk/gtk.h>
-#include "options.h"
 #include "bbbm.h"
-
-gchar *EXTENSIONS[] = BBBM_EXTENSIONS;
+#include "options.h"
 
 static void clean_up_child_process(int signal_number)
 {
-    // wait for any child
     wait(NULL);
 }
 
@@ -44,12 +42,10 @@ int main(int argc, char *argv[])
         {"version", no_argument, 0, 'v'},
         {0, 0, 0, 0}
     };
-    static const char *short_opts = "hv";
-    int c;
-    struct options opts = {NULL, NULL, NULL, 0};
-    gchar homedir[PATH_MAX];
-    gchar config[PATH_MAX];
-    gchar thumbsdir[PATH_MAX];
+    static const gchar *short_opts = "hv";
+    gint c;
+    gchar *homedir, *config, *thumbdir;
+    struct options *opts;
     BBBM *bbbm;
 
     struct sigaction sigchld_action;
@@ -59,8 +55,7 @@ int main(int argc, char *argv[])
 
     gtk_init(&argc, &argv);
 
-    while ((c = getopt_long(argc, argv, short_opts, long_opts, NULL)) > -1)
-    {
+    while ((c = getopt_long(argc, argv, short_opts, long_opts, NULL)) != -1)
         switch (c)
         {
             case 'h':
@@ -81,12 +76,7 @@ int main(int argc, char *argv[])
                 fprintf(stderr, "Try `bbbm --help` for more information.\n");
                 return 1;
         }
-    }
-    // assume no paths longer than PATH_MAX (which is 4092, large enough)
-    g_stpcpy(g_stpcpy(homedir, getenv("HOME")), BBBM_DIR);
-    g_stpcpy(g_stpcpy(config, homedir), BBBM_CONFIG);
-    g_stpcpy(g_stpcpy(thumbsdir, homedir), BBBM_THUMBS);
-
+    homedir = g_strconcat(g_getenv("HOME"), BBBM_DIR, NULL);
     if (!g_file_test(homedir, G_FILE_TEST_IS_DIR))
     {
         if (!g_file_test(homedir, G_FILE_TEST_EXISTS))
@@ -94,39 +84,46 @@ int main(int argc, char *argv[])
         else
         {
             fprintf(stderr, "bbbm: '%s' is not a directory\n", homedir);
+            g_free(homedir);
             return 1;
         }
     }
+    config = g_strconcat(homedir, BBBM_CONFIG, NULL);
     if (!g_file_test(config, G_FILE_TEST_EXISTS))
     {
-        create_default_options(&opts);
-        if (write_options(&opts, config))
+        opts = bbbm_options_new();
+        if (bbbm_options_write(opts, config))
             fprintf(stderr, "bbbm: could not write to '%s'\n", config);
+        /* do not exit */
     }
-    else if (read_options(&opts, config))
+    else if (!(opts = bbbm_options_read(config)))
+    {
+        /* bbbm_options_read printed the error */
+        g_free(homedir);
+        g_free(config);
         return 1;
-    // else file exists and read successfully
-
-    bbbm = bbbm_new(&opts, config, thumbsdir,
+    }
+    /* else file exists and read successfully */
+    thumbdir = g_strconcat(homedir, BBBM_THUMBS, NULL);
+    g_free(homedir);
+    bbbm = bbbm_new(opts, config, thumbdir,
                     (optind < argc ? argv[optind] : NULL));
 
     gtk_main();
-
     bbbm_destroy(bbbm);
-
-    // all along, a pointer to opts is used, so just use opts again
-    if (write_options(&opts, config))
+    if (bbbm_options_write(opts, config))
         fprintf(stderr, "bbbm: could not write to '%s'\n", config);
-    destroy_options(&opts);
-
-    if (g_file_test(thumbsdir, G_FILE_TEST_IS_DIR))
+    /* do not exit */
+    bbbm_options_destroy(opts);
+    g_free(config);
+    if (g_file_test(thumbdir, G_FILE_TEST_IS_DIR))
     {
-        gchar command[PATH_MAX + 10];
-        g_stpcpy(g_stpcpy(g_stpcpy(command, "rm -rf "), thumbsdir), "/*");
+        gchar *command = g_strconcat("rm -rf ", thumbdir, "/*", NULL);
         if (system(command) == -1)
-            fprintf(stderr, "bbbm: could not remove thumbs in %s\n",
-                    thumbsdir);
+            fprintf(stderr, "bbbm: could not remove thumbs in '%s': %s\n",
+                    thumbdir, g_strerror(errno));
+        g_free(command);
     }
-
+    g_free(thumbdir);
     return 0;
 }

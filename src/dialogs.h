@@ -21,19 +21,41 @@
 #ifndef __BBBM_DIALOGS_H_
 #define __BBBM_DIALOGS_H_
 
-#include "bbbm.h"
+#include <gtk/gtk.h>
+#include "options.h"
 
-/* Shows the Options dialog for the given BBBM application. */
-void bbbm_options_dialog(BBBM *bbbm);
+typedef gboolean (* save_function) (gpointer data, const gchar *file);
 
-/* Shows the About dialog for the given BBBM application. */
-void bbbm_about_dialog(BBBM *bbbm);
+enum
+{
+    OPTIONS_SET_CMD_CHANGED = 1,
+    OPTIONS_VIEW_CMD_CHANGED = 2,
+    OPTIONS_THUMB_SIZE_CHANGED = 4,
+    OPTIONS_THUMB_COLS_CHANGED = 8,
+    OPTIONS_FILENAME_LABEL_CHANGED = 16,
+    OPTIONS_FILENAME_TITLE_CHANGED = 32
+};
 
-/* Shows the Move dialogs for the given BBBM image at the given index.
-   Forward indicates whether it is a Move forward or Move back dialog. */
-void bbbm_move_dialog(BBBMImage *image, gint index, gboolean forward);
+gboolean bbbm_dialogs_question(GtkWindow *parent, const gchar *title,
+                               const gchar *message);
 
-/* Shows the Edit description dialog for the given BBBM image. */
-void bbbm_edit_description_dialog(BBBMImage *image);
+void bbbm_dialogs_error(GtkWindow *parent, const gchar *message);
 
-#endif /* __BBBM_DIALOG_H_ */
+GList *bbbm_dialogs_get_files(GtkWindow *parent, const gchar *title);
+
+GList *bbbm_dialogs_get_files_dir(GtkWindow *parent, const gchar *title);
+
+gchar *bbbm_dialogs_get_file(GtkWindow *parent, const gchar *title);
+
+void bbbm_dialogs_save(GtkWindow *parent, const gchar *title,
+                       save_function save, gpointer data);
+
+guint bbbm_dialogs_options(GtkWindow *parent, struct options *opts);
+
+void bbbm_dialogs_about(GtkWindow *parent);
+
+gint bbbm_dialogs_move(GtkWindow *parent, const gchar *title, guint limit);
+
+gchar *bbbm_dialogs_edit(GtkWindow *parent, const gchar *initial);
+
+#endif /* __BBBM_DIALOGS_H_ */

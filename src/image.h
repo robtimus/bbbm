@@ -28,18 +28,25 @@
 
 typedef struct
 {
-    BBBM *bbbm; // the BBBM parent window
-    GtkWidget *box; // the event box that is the actual widget
-    gchar *filename; // the filename
-    gchar *description; // the description
+    BBBM *bbbm;
+    GtkWidget *box;
+    gchar *filename;
+    gchar *description;
 } BBBMImage;
 
-/* Creates a new image with the given filename and description, and thumb,
-   and returns it. */
 BBBMImage *bbbm_image_new(BBBM *bbbm, const gchar *filename,
                           const gchar *description, const gchar *thumb);
 
-/* Destroys the specified image. */
-void bbbm_image_destroy(BBBMImage *);
+void bbbm_image_destroy(BBBMImage *image);
+
+const gchar *bbbm_image_get_filename(BBBMImage *image);
+
+const gchar *bbbm_image_get_description(BBBMImage *image);
+
+void bbbm_image_set_description(BBBMImage *image, const gchar *description);
+
+gint bbbm_image_compare_filename(BBBMImage *image1, BBBMImage *image2);
+
+gint bbbm_image_compare_description(BBBMImage *image1, BBBMImage *image2);
 
 #endif /* __BBBM_IMAGE_H_ */

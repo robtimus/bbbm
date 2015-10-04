@@ -19,187 +19,356 @@
  */
 
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
-#include <glib.h>
+#include <stdlib.h>
+#include <errno.h>
+#include <gtk/gtk.h>
 #include "options.h"
-#include "bbbm.h"
+#include "util.h"
 
-void create_default_options(struct options *opts)
+struct options *bbbm_options_new()
 {
-    if (!opts->set_command)
-        opts->set_command = g_strdup(SET_COMMAND);
-    if (!opts->view_command)
-        opts->view_command = g_strdup(VIEW_COMMAND);
-    if (!opts->thumb_size)
-        opts->thumb_size = g_strdup(THUMB_SIZE);
-    if (!opts->thumb_cols)
-        opts->thumb_cols = THUMB_COLS;
+    struct options *opts = g_malloc(sizeof(struct options));
+    opts->set_cmd = g_strdup(SET_COMMAND);
+    opts->view_cmd = g_strdup(VIEW_COMMAND);
+    opts->thumb_size = g_strdup(THUMB_SIZE);
+    opts->thumb_width = THUMB_WIDTH;
+    opts->thumb_height = THUMB_HEIGHT;
+    opts->thumb_cols = THUMB_COLS;
+    return opts;
 }
 
-void destroy_options(struct options *opts)
+void bbbm_options_destroy(struct options *opts)
 {
-    g_free(opts->set_command);
-    opts->set_command = NULL;
-    g_free(opts->view_command);
-    opts->view_command = NULL;
+    g_free(opts->set_cmd);
+    g_free(opts->view_cmd);
     g_free(opts->thumb_size);
-    opts->thumb_size = NULL;
-    opts->thumb_cols = 0;
+    g_free(opts);
 }
 
-gint write_options(struct options *opts, const gchar *filename)
+gint bbbm_options_write(struct options *opts, const gchar *filename)
 {
-    FILE *f;
-    if (!(f = fopen(filename, "w")))
+    FILE *file = fopen(filename, "w");
+    if (!file)
     {
-        fprintf(stderr, "bbbm: could not write to %s\n", filename);
+        fprintf(stderr, "bbbm: could not write to '%s': %s\n",
+                filename, g_strerror(errno));
         return 1;
     }
-    fprintf(f, "# WARNING: editing this file is not recommended.\n");
-    fprintf(f, "# This file will be overwritten when bbbm closes.\n\n");
-    fprintf(f, "set_command = %s\n", opts->set_command);
-    fprintf(f, "view_command = %s\n", opts->view_command);
-    fprintf(f, "thumb_size = %s\n", opts->thumb_size);
-    fprintf(f, "thumb_cols = %d\n", opts->thumb_cols);
-    return fclose(f);
+    fprintf(file, "# WARNING: editing this file is not recommended.\n");
+    fprintf(file, "# This file will be overwritten when bbbm closes.\n\n");
+    fprintf(file, "set_command = %s\n", opts->set_cmd);
+    fprintf(file, "view_command = %s\n", opts->view_cmd);
+    fprintf(file, "thumb_size = %dx%d\n", opts->thumb_width,
+                                          opts->thumb_height);
+    fprintf(file, "thumb_cols = %d\n", opts->thumb_cols);
+    fprintf(file, "filename_label = %s\n",
+            (opts->filename_label ? "TRUE" : "FALSE"));
+    fprintf(file, "filename_title = %s\n",
+            (opts->filename_title ? "TRUE" : "FALSE"));
+    return fclose(file);
 }
 
-gint read_options(struct options *opts, const gchar *filename)
+struct options *bbbm_options_read(const gchar *filename)
 {
-    FILE *f;
-    gchar *set_command = NULL; // temporary value
-    gchar *view_command = NULL; // temporary value
-    gchar *thumb_size = NULL; // temporary value
-    gdouble thumb_cols = 0; // temporary value
-    guint lineno = 0; // the current line number
-    gchar line[PATH_MAX]; // the current line
-
-    if (!opts)
+    struct options *opts = NULL;
+    gchar *thumb_cols = NULL;
+    gchar *filename_label = NULL;
+    gchar *filename_title = NULL;
+    guint lineno = 0;
+    gchar line[PATH_MAX];
+    FILE *file = fopen(filename, "r");
+    if (!file)
     {
-        opts = g_malloc(sizeof(struct options));
-        memset(opts, 0, sizeof(struct options));
+        fprintf(stderr, "bbbm: could not read '%s': %s\n",
+                filename, g_strerror(errno));
+        return NULL;
     }
-
-    if (!(f = fopen(filename, "r")))
+    opts = g_malloc(sizeof(struct options));
+    memset(opts, 0, sizeof(struct options));
+    while (++lineno && fgets(line, PATH_MAX, file))
     {
-        fprintf(stderr, "bbbm: could not read '%s'\n", filename);
-        return 1;
-    }
-    while (++lineno && fgets(line, PATH_MAX, f))
-    {
-        gchar **opt_val;
+        gchar **optval;
         if (line[0] == '\n' || line[0] == '#')
             continue;
-        opt_val = g_strsplit(line, "=", 2);
-        if (!opt_val[0] || !opt_val[1])
+        optval = g_strsplit(line, "=", 2);
+        if (!optval[0] || !optval[1])
         {
             fprintf(stderr, "bbbm: error on line %d of '%s': %s\n",
                     lineno, filename, line);
-            fclose(f);
-            g_strfreev(opt_val);
-            return 1;
+            fclose(file);
+            g_strfreev(optval);
+            bbbm_options_destroy(opts);
+            return NULL;
         }
-        g_strstrip(opt_val[0]);
-        g_strstrip(opt_val[1]);
-        if (!strcmp(opt_val[0], "set_command"))
+        g_strstrip(optval[0]);
+        g_strstrip(optval[1]);
+        if (!strcmp(optval[0], "set_command"))
         {
-            if (!set_command)
-                set_command = opt_val[1];
+            if (!opts->set_cmd)
+                opts->set_cmd = optval[1];
             else
-                g_free(opt_val[1]);
-            g_free(opt_val[0]);
-            g_free(opt_val);
+            {
+                fprintf(stderr, "bbbm: duplicate value of option '%s' on line"
+                        " %d of '%s': %s. Using first value %s\n",
+                        optval[0], lineno, filename, optval[1], opts->set_cmd);
+                g_free(optval[1]);
+            }
+            g_free(optval[0]);
+            g_free(optval);
             continue;
         }
-        if (!strcmp(opt_val[0], "view_command"))
+        if (!strcmp(optval[0], "view_command"))
         {
-            if (!view_command)
-                view_command = opt_val[1];
+            if (!opts->view_cmd)
+                opts->view_cmd = optval[1];
             else
-                g_free(opt_val[1]);
-            g_free(opt_val[0]);
-            g_free(opt_val);
+            {
+                fprintf(stderr, "bbbm: duplicate value of option '%s' on line"
+                        " %d of '%s': %s. Using first value %s\n",
+                        optval[0], lineno, filename, optval[1],
+                        opts->view_cmd);
+                g_free(optval[1]);
+            }
+            g_free(optval[0]);
+            g_free(optval);
             continue;
         }
-        if (!strcmp(opt_val[0], "thumb_size"))
+        if (!strcmp(optval[0], "thumb_size"))
         {
-            if (!thumb_size)
-                thumb_size = opt_val[1];
+            if (!opts->thumb_size)
+            {
+                gchar *mid, *end;
+                opts->thumb_size = optval[1];
+                opts->thumb_width = strtod(opts->thumb_size, &mid);
+                if (*mid != 'x' || mid == opts->thumb_size)
+                {
+                    fprintf(stderr, "bbbm: illegal value of option '%s' on "
+                            "line %d: %s\n", optval[0], lineno, optval[1]);
+                    fclose(file);
+                    g_free(optval[0]);
+                    g_free(optval);
+                    bbbm_options_destroy(opts);
+                    return NULL;
+                }
+                /* skip past the x */
+                ++mid;
+                opts->thumb_height = strtod(mid, &end);
+                if (*end || end == mid)
+                {
+                    fprintf(stderr, "bbbm: illegal value of option '%s' on "
+                            "line %d: %s\n", optval[0], lineno, optval[1]);
+                    fclose(file);
+                    g_free(optval[0]);
+                    g_free(optval);
+                    bbbm_options_destroy(opts);
+                    return NULL;
+                }
+            }
             else
-                g_free(opt_val[1]);
-            g_free(opt_val[0]);
-            g_free(opt_val);
+            {
+                fprintf(stderr, "bbbm: duplicate value of option '%s' on line"
+                        " %d of '%s': %s. Using first value %s\n",
+                        optval[0], lineno, filename, optval[1],
+                        opts->thumb_size);
+                g_free(optval[1]);
+            }
+            g_free(optval[0]);
+            g_free(optval);
             continue;
         }
-        if (!strcmp(opt_val[0], "thumb_cols"))
+        if (!strcmp(optval[0], "thumb_cols"))
         {
             if (!thumb_cols)
             {
-                gchar *end = NULL;
-                thumb_cols = strtod(opt_val[1], &end);
-                if (!end || *end)
+                gchar *end;
+                thumb_cols = optval[1];
+                opts->thumb_cols = strtod(thumb_cols, &end);
+                if (*end || end == thumb_cols)
                 {
-                    fprintf(stderr, "bbbm: illegal value of 'thumb_cols`: %s.",
-                            opt_val[1]);
-                    fprintf(stderr, " Using default value\n");
-                    thumb_cols = THUMB_COLS;
+                    fprintf(stderr, "bbbm: illegal value of option '%s' on "
+                            "line %d: %s\n", optval[0], lineno, optval[1]);
+                    fclose(file);
+                    g_strfreev(optval);
+                    g_free(filename_label);
+                    g_free(filename_title);
+                    bbbm_options_destroy(opts);
+                    return NULL;
                 }
-                // else either end !- NULL and end != '\0'
             }
-            g_strfreev(opt_val);
+            else
+            {
+                fprintf(stderr, "bbbm: duplicate value of option '%s' on line"
+                        " %d of '%s': %s. Using first value %s\n",
+                        optval[0], lineno, filename, optval[1], thumb_cols);
+                g_free(optval[1]);
+            }
+            g_free(optval[0]);
+            g_free(optval);
+            continue;
+        }
+        if (!strcmp(optval[0], "filename_label"))
+        {
+            if (!filename_label)
+            {
+                filename_label = optval[1];
+                if (!strcasecmp(optval[1], "true"))
+                    opts->filename_label = TRUE;
+                else if (!strcasecmp(optval[1], "false"))
+                    opts->filename_label = FALSE;
+                else
+                {
+                    fprintf(stderr, "bbbm: illegal value of option '%s' on "
+                            "line %d: %s\n", optval[0], lineno, optval[1]);
+                    fclose(file);
+                    g_strfreev(optval);
+                    g_free(thumb_cols);
+                    g_free(filename_title);
+                    bbbm_options_destroy(opts);
+                    return NULL;
+                }
+            }
+            else
+            {
+                fprintf(stderr, "bbbm: duplicate value of option '%s' on line"
+                        " %d of '%s': %s. Using first value %s\n",
+                        optval[0], lineno, filename, optval[1],
+                        filename_label);
+                g_free(optval[1]);
+            }
+            g_free(optval[0]);
+            g_free(optval);
+            continue;
+        }
+        if (!strcmp(optval[0], "filename_title"))
+        {
+            if (!filename_title)
+            {
+                filename_title = optval[1];
+                if (!strcasecmp(optval[1], "true"))
+                    opts->filename_title = TRUE;
+                else if (!strcasecmp(optval[1], "false"))
+                    opts->filename_title = FALSE;
+                else
+                {
+                    fprintf(stderr, "bbbm: illegal value of option '%s' on "
+                            "line %d: %s\n", optval[0], lineno, optval[1]);
+                    fclose(file);
+                    g_strfreev(optval);
+                    g_free(filename_label);
+                    g_free(thumb_cols);
+                    bbbm_options_destroy(opts);
+                    return NULL;
+                }
+            }
+            else
+            {
+                fprintf(stderr, "bbbm: duplicate value of option '%s' on line"
+                        " %d of '%s': %s. Using first value %s\n",
+                        optval[0], lineno, filename, optval[1],
+                        filename_label);
+                g_free(optval[1]);
+            }
+            g_free(optval[0]);
+            g_free(optval);
             continue;
         }
     }
-    if (fclose(f))
+    if (fclose(file))
+        fprintf(stderr, "bbbm: could not close '%s': %s\n",
+                filename, g_strerror(errno));
+    if (!opts->set_cmd)
     {
-        fprintf(stderr, "bbbm: could not close '%s'\n", filename);
-        return 1;
+        fprintf(stderr, "bbbm: option 'set_command' missing. "
+                "Using default value '%s'\n", SET_COMMAND);
+        opts->set_cmd = g_strdup(SET_COMMAND);
     }
-    if (!set_command)
+    if (!opts->view_cmd)
     {
-        fprintf(stderr, "bbbm: option 'set_command' missing.");
-        fprintf(stderr, " Using default value\n");
-        opts->set_command = g_strdup(SET_COMMAND);
+        fprintf(stderr, "bbbm: option 'view_command' missing. "
+                "Using default value '%s'\n", VIEW_COMMAND);
+        opts->view_cmd = g_strdup(VIEW_COMMAND);
     }
-    else
-        opts->set_command = set_command;
-    if (!view_command)
+    if (!opts->thumb_size)
     {
-        fprintf(stderr, "bbbm: option 'view_command' missing.");
-        fprintf(stderr, " Using default value\n");
-        opts->set_command = g_strdup(VIEW_COMMAND);
-    }
-    else
-        opts->view_command = view_command;
-    if (!thumb_size)
-    {
-        fprintf(stderr, "bbbm: option 'thumb_size' missing.");
-        fprintf(stderr, " Using default value\n");
+        fprintf(stderr, "bbbm: option 'thumb_size' missing. "
+                "Using default value '%s'\n", THUMB_SIZE);
         opts->thumb_size = g_strdup(THUMB_SIZE);
+        opts->thumb_width = THUMB_WIDTH;
+        opts->thumb_height = THUMB_HEIGHT;
     }
     else
-        opts->thumb_size = thumb_size;
+    {
+        gboolean changed = FALSE;
+        if (opts->thumb_width <= 0)
+        {
+            fprintf(stderr, "bbbm: thumb width <= 0. Using value 1\n");
+            opts->thumb_width = 1;
+            changed = TRUE;
+        }
+        else if (opts->thumb_width > MAX_WIDTH)
+        {
+            fprintf(stderr, "bbbm: thumb width > %d. Using value %d\n",
+                    MAX_WIDTH, MAX_WIDTH);
+            opts->thumb_width = MAX_WIDTH;
+            changed = TRUE;
+        }
+        if (opts->thumb_height <= 0)
+        {
+            fprintf(stderr, "bbbm: thumb height <= 0. Using value 1\n");
+            opts->thumb_height = 1;
+            changed = TRUE;
+        }
+        else if (opts->thumb_height > MAX_HEIGHT)
+        {
+            fprintf(stderr, "bbbm: thumb height > %d. Using value %d\n",
+                    MAX_HEIGHT, MAX_HEIGHT);
+            opts->thumb_height = MAX_HEIGHT;
+            changed = TRUE;
+        }
+        if (changed)
+        {
+            g_free(opts->thumb_size);
+            opts->thumb_size = bbbm_util_get_size_str(opts->thumb_width,
+                                                      opts->thumb_height);
+        }
+    }
     if (!thumb_cols)
     {
-        fprintf(stderr, "bbbm: option 'thumb_cols' missing or 0.");
-        fprintf(stderr, " Using default value\n");
+        fprintf(stderr, "bbbm: option 'thumb_cols' missing. "
+                "Using default value '%d'\n", THUMB_COLS);
         opts->thumb_cols = THUMB_COLS;
     }
-    else if (thumb_cols < 0)
+    else
     {
-        fprintf(stderr, "bbbm: option 'thumb_cols' is negative.");
-        fprintf(stderr, " Using value 1\n");
-        opts->thumb_cols = 1;
+        g_free(thumb_cols);
+        if (opts->thumb_cols <= 0)
+        {
+            fprintf(stderr, "bbbm: option 'thumb_cols' <= 0. Using value 1\n");
+            opts->thumb_cols = 1;
+        }
+        else if (opts->thumb_cols > MAX_COLS)
+        {
+            fprintf(stderr, "bbbm: option 'thumb_cols' > %d. Using value %d\n",
+                    MAX_COLS, MAX_COLS);
+            opts->thumb_cols = MAX_COLS;
+        }
     }
-    else if (thumb_cols > MAX_COLS)
+    if (!filename_label)
     {
-        fprintf(stderr, "bbbm: option 'thumb_cols' is bigger than %d.",
-                MAX_COLS);
-        fprintf(stderr, " Using value %d\n", MAX_COLS);
-        opts->thumb_cols = MAX_COLS;
+        fprintf(stderr, "bbbm: option 'filename_label' missing. "
+                "Using default value 'FALSE'\n");
+        opts->filename_label = FALSE;
     }
     else
-        opts->thumb_cols = (guint)thumb_cols;
-    return 0;
+        g_free(filename_label);
+    if (!filename_title)
+    {
+        fprintf(stderr, "bbbm: option 'filename_title' missing. "
+                "Using default value 'FALSE'\n");
+        opts->filename_title = FALSE;
+    }
+    else
+        g_free(filename_title);
+    return opts;
 }

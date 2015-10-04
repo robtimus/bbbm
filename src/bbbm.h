@@ -21,53 +21,34 @@
 #ifndef __BBBM_H_
 #define __BBBM_H_
 
-#define VERSION         "0.4.2"
+#define VERSION         "0.5"
 #define BBBM_DIR        "/.bbbm"
 #define BBBM_CONFIG     "/bbbm.cfg"
-#define BBBM_THUMBS     "/thumbs"
-
-#define BBBM_EXTENSIONS {".jpg", ".jpeg", ".gif", ".ppm", ".pgm", NULL}
-#define MAX_COLS        10
+#define BBBM_THUMBS     "/thumbs/"
 
 #include <gtk/gtk.h>
 #include "options.h"
 
-extern gchar *EXTENSIONS[];
-
 typedef struct
 {
-    guint padding; // the padding between the images
-    const gchar *config; // the configuration file used
-    const gchar *thumbsdir; // the thumbs directory
-    gchar *filename; // the current filename, or NULL
-    struct options *opts; // the options
-    gboolean modified; // whether the current collection was modified
-    GList *images; // a list of images
-    GtkWidget *window; // the window
-    GtkWidget *table; // the table
-    GtkWidget *file_statusbar; // the statusbar for the current filename
-    GtkWidget *image_statusbar; // the statusbar for image descriptions
+    struct options *opts;
+    const gchar *config;
+    const gchar *thumbdir;
+    gchar *filename;
+    gboolean modified;
+    GList *images;
+    GtkWidget *window;
+    GtkWidget *table;
+    GtkWidget *file_bar;
+    guint file_cid;
+    guint file_mod_cid;
+    GtkWidget *image_bar;
+    guint image_cid;
 } BBBM;
 
-/* Creates a new BBBM application, shows it, and returns it.
-   If file is not NULL, it is opened. */
 BBBM *bbbm_new(struct options *opts, const gchar *config,
-               const gchar *thumbsdir, const gchar *file);
+               const gchar *thumbdir, const gchar *file);
 
-/* Destroys the given BBBM application. */
 void bbbm_destroy(BBBM *bbbm);
-
-/* Clears the statusbar of the given BBBM application. */
-void bbbm_statusbar_clear(BBBM *bbbm);
-
-/* Reorders all images of the given BBBM application, starting at the given
-   index. */
-void bbbm_reorder(BBBM *bbbm, guint index);
-
-/* Resizes all thumbs of the given BBBM application. */
-void bbbm_resize_thumbs(BBBM *bbbm);
-
-/* Sets the modified status of the given BBBM application. */
-void bbbm_set_modified(BBBM *bbbm, gboolean modified);
 
 #endif /* __BBBM_H_ */

@@ -26,29 +26,34 @@
 #define SET_COMMAND     "bsetbg"
 #define VIEW_COMMAND    "gqview"
 #define THUMB_SIZE      "128x96"
+#define THUMB_WIDTH     128
+#define THUMB_HEIGHT    96
 #define THUMB_COLS      4
+
+#define MAX_WIDTH       (gdk_screen_width())
+#define MAX_HEIGHT      (gdk_screen_height())
+#define MAX_COLS        10
 
 struct options
 {
-    gchar *set_command; // the command used for setting images
-    gchar *view_command; // the command used for viewing images
-    gchar *thumb_size; // the size of the thumb, in XxY format
-    guint thumb_cols; // the number of columns
+    gchar *set_cmd;
+    gchar *view_cmd;
+    /* adding images will happen more frequently than changing size;
+       store size string */
+    gchar *thumb_size;
+    gint thumb_width;
+    gint thumb_height;
+    gint thumb_cols;
+    gboolean filename_label;
+    gboolean filename_title;
 };
 
-/* Fills opts with the default values for any NULL / 0 value. */
-void create_default_options(struct options *opts);
+struct options *bbbm_options_new();
 
-/* Destroys the contents of the given options. */
-void destroy_options(struct options *opts);
+void bbbm_options_destroy(struct options *opts);
 
-/* Writes the given options to the given file.
-   Returns 0 when successful, or non-0 otherwise. */
-gint write_options(struct options *opts, const gchar *filename);
+gint bbbm_options_write(struct options *opts, const gchar *filename);
 
-/* Reads options from the given file into the given options, using default
-    values for any missing options.
-    Returns 0 when successful, or non-0 otherwise. */
-gint read_options(struct options *opts, const gchar *filename);
+struct options *bbbm_options_read(const gchar *filename);
 
 #endif /* __BBBM_OPTIONS_H_ */

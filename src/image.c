@@ -18,21 +18,24 @@
  * Boston, MA 02111-1307, USA.
  */
 
+#include <string.h>
 #include <gtk/gtk.h>
 #include "image.h"
+#include "bbbm.h"
 
-BBBMImage *bbbm_image_new(BBBM* bbbm, const gchar *filename,
+BBBMImage *bbbm_image_new(BBBM *bbbm, const gchar *filename,
                           const gchar *description, const gchar *thumb)
 {
-    BBBMImage *bbbm_image = g_malloc(sizeof(BBBMImage));
-    GtkWidget *image = gtk_image_new_from_file(thumb); // the actual image
-    gtk_widget_show(image);
-    bbbm_image->bbbm = bbbm;
-    bbbm_image->box = gtk_event_box_new();
-    gtk_container_add(GTK_CONTAINER(bbbm_image->box), image);
-    bbbm_image->filename = g_strdup(filename);
-    bbbm_image->description = g_strdup(description);
-    return bbbm_image;
+    GtkWidget *img;
+    BBBMImage *image = g_malloc(sizeof(BBBMImage));
+    image->bbbm = bbbm;
+    image->filename = g_strdup(filename);
+    image->description = g_strdup(description);
+    image->box = gtk_event_box_new();
+    img = gtk_image_new_from_file(thumb);
+    gtk_widget_show(img);
+    gtk_container_add(GTK_CONTAINER(image->box), img);
+    return image;
 }
 
 void bbbm_image_destroy(BBBMImage *image)
@@ -41,4 +44,32 @@ void bbbm_image_destroy(BBBMImage *image)
     g_free(image->description);
     gtk_widget_destroy(image->box);
     g_free(image);
+}
+
+const gchar *bbbm_image_get_filename(BBBMImage *image)
+{
+    return image->filename;
+}
+
+const gchar *bbbm_image_get_description(BBBMImage *image)
+{
+    return image->description;
+}
+
+void bbbm_image_set_description(BBBMImage *image, const gchar *description)
+{
+    if (!description)
+        return;
+    g_free(image->description);
+    image->description = g_strdup(description);
+}
+
+gint bbbm_image_compare_filename(BBBMImage *image1, BBBMImage *image2)
+{
+    return strcmp(image1->filename, image2->filename);
+}
+
+gint bbbm_image_compare_description(BBBMImage *image1, BBBMImage *image2)
+{
+    return strcmp(image1->description, image2->description);
 }

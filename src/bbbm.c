@@ -19,851 +19,509 @@
  */
 
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
-#include <gtk/gtk.h>
-#include <sys/stat.h>
-#include <sys/wait.h>
+#include <stdlib.h>
 #include <errno.h>
-#include <unistd.h>
-#include "options.h"
-#include "image.h"
+#include <gtk/gtk.h>
 #include "bbbm.h"
+#include "image.h"
 #include "dialogs.h"
+#include "options.h"
 #include "util.h"
 
-#define BBBM_SAVE       1
-#define BBBM_LIST       2
-#define BBBM_MENU       3
+#define PADDING         5
 
-#define FILENAME_SORT           1
-#define DESCRIPTION_SORT        2
+static gboolean bbbm_exit_window(GtkWidget *widget, GdkEvent *event,
+                                 BBBM *bbbm);
 
-#define FILE_CONTEXT    "Filename"
-#define IMAGE_CONTEXT   "Image"
+static void bbbm_open(BBBM *bbbm);
+static inline gboolean bbbm_open0(BBBM *bbbm, const gchar *filename);
+static void bbbm_save(BBBM *bbbm);
+static void bbbm_save_as(BBBM *bbbm);
+static gboolean bbbm_save_as0(BBBM *bbbm, const gchar *filename);
+static void bbbm_close(BBBM *bbbm);
+static inline void bbbm_close0(BBBM *bbbm);
+static void bbbm_exit(BBBM *bbbm);
+static void bbbm_add_image(BBBM *bbbm);
+static gboolean bbbm_add_image0(BBBM *bbbm, const gchar *filename,
+                                const gchar *description, gint index);
+static void bbbm_add_directory(BBBM *bbbm);
+static void bbbm_add_collection(BBBM *bbbm);
+static gboolean bbbm_add_collection0(BBBM *bbbm, const gchar *filename);
+static void bbbm_sort_filename(BBBM *bbbm);
+static void bbbm_sort_description(BBBM *bbbm);
+static void bbbm_create_list(BBBM *bbbm);
+static gboolean bbbm_create_list0(BBBM *bbbm, const gchar *filename);
+static void bbbm_create_menu(BBBM *bbbm);
+static gboolean bbbm_create_menu0(BBBM *bbbm, const gchar *filename);
+static inline void bbbm_write_string(FILE *file, const gchar *string);
+static void bbbm_random_background(BBBM *bbbm);
+static void bbbm_options(BBBM *bbbm);
+static void bbbm_about(BBBM *bbbm);
 
-typedef gint (*create_func)(BBBM *, const gchar *);
-static gint bbbm_save_to(BBBM *, const gchar *);
-static gint bbbm_create_list(BBBM *, const gchar *);
-static gint bbbm_create_menu(BBBM *, const gchar *);
-static inline void bbbm_create_menu_item(FILE *, const gchar *, const gchar *,
-                                         const gchar *);
-static gint bbbm_compare_filename(gconstpointer, gconstpointer);
-static gint bbbm_compare_description(gconstpointer, gconstpointer);
+static inline GtkWidget *bbbm_create_menubar(BBBM *bbbm);
+static gboolean bbbm_can_close(BBBM *bbbm);
+static void bbbm_set_modified(BBBM *bbbm, gboolean modified);
+static void bbbm_reset_images(BBBM *bbbm, guint index);
+static void bbbm_resize_thumbs(BBBM *bbbm);
 
-static inline gboolean bbbm_can_close(BBBM *);
-static inline void bbbm_close_collection(BBBM *);
-static inline gboolean bbbm_ask_overwrite(BBBM *, const gchar *);
-static inline void bbbm_error_message(BBBM *, const gchar *);
-static inline gboolean bbbm_is_image(const gchar *);
-static inline GtkWidget *create_chooser(BBBM *, const gchar *, gboolean,
-                                        gboolean);
-static inline void bbbm_execute(const gchar *, gchar *);
+static gboolean bbbm_set_image(GtkWidget *widget, GdkEventButton *event,
+                               BBBMImage *image);
+static gboolean bbbm_popup(GtkWidget *widget, GdkEventButton *event,
+                           BBBMImage *image);
+static gboolean bbbm_set_status(GtkWidget *widget, GdkEventCrossing *event,
+                                BBBMImage *image);
+static gboolean bbbm_clear_status(GtkWidget *widget, GdkEventCrossing *event,
+                                  BBBMImage *image);
 
-static GtkWidget *bbbm_create_menu_bar(BBBM *);
-static gboolean bbbm_set_status(GtkWidget *, GdkEvent *, BBBMImage *);
-static gboolean bbbm_clear_status(GtkWidget *, GdkEvent *, BBBM *);
-static void bbbm_open(BBBM *);
-static void bbbm_open_collection(BBBM *, const gchar *);
-static void bbbm_save(BBBM *);
-static void bbbm_close(BBBM *);
-static gboolean bbbm_exit_window(GtkWidget *, GdkEvent *, BBBM *);
-static void bbbm_exit(BBBM *);
-static void bbbm_add_image(BBBM *);
-static void bbbm_add_image0(BBBM *, gchar *, gchar *, gint);
-static void bbbm_add_directory(BBBM *);
-static void bbbm_add_collection(BBBM *);
-static void bbbm_add_collection0(BBBM *, const gchar *);
-static void bbbm_create(BBBM *, gint);
-static void bbbm_random_background(BBBM *);
-static void bbbm_sort_images(BBBM *, gint);
-static gboolean bbbm_set_image(GtkWidget *, GdkEvent *, BBBMImage *);
-static gboolean bbbm_popup(GtkWidget *, GdkEventButton *, BBBMImage *);
-static void bbbm_set(BBBMImage *);
-static void bbbm_view(BBBMImage *);
-static void bbbm_move_back(BBBMImage *, gint);
-static void bbbm_move_forward(BBBMImage *, gint);
-static void bbbm_insert(BBBMImage *);
-static void bbbm_delete(BBBMImage *);
+static void bbbm_set(BBBMImage *image);
+static void bbbm_view(BBBMImage *image);
+static void bbbm_move_back(BBBMImage *image, guint index);
+static void bbbm_move_forward(BBBMImage *image, guint index);
+static void bbbm_edit(BBBMImage *image);
+static void bbbm_insert(BBBMImage *image, guint index);
+static void bbbm_delete(BBBMImage *image, guint index);
 
 BBBM *bbbm_new(struct options *opts, const gchar *config,
-               const gchar *thumbsdir, const gchar *file)
+               const gchar *thumbdir, const gchar *file)
 {
-    GtkWidget *vbox, *hbox, *menu_bar, *scroll;
-
+    GtkWidget *vbox, *hbox, *menubar, *scroll;
     BBBM *bbbm = g_malloc(sizeof(BBBM));
-    bbbm->padding = 5;
-    bbbm->config = config;
-    bbbm->thumbsdir = thumbsdir;
-    bbbm->filename = NULL;
     bbbm->opts = opts;
+    bbbm->config = config;
+    bbbm->thumbdir = thumbdir;
+    bbbm->filename = NULL;
     bbbm->modified = FALSE;
     bbbm->images = NULL;
 
     bbbm->window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
     gtk_window_set_default_size(GTK_WINDOW(bbbm->window), 640, 480);
     gtk_window_set_title(GTK_WINDOW(bbbm->window), "bbbm "VERSION);
-    gtk_signal_connect(GTK_OBJECT(bbbm->window), "delete-event",
-                       GTK_SIGNAL_FUNC(bbbm_exit_window), bbbm);
+    g_signal_connect(G_OBJECT(bbbm->window), "delete-event",
+                     G_CALLBACK(bbbm_exit_window), bbbm);
     vbox = gtk_vbox_new(FALSE, 0);
     gtk_container_set_border_width(GTK_CONTAINER(vbox), 0);
-    menu_bar = bbbm_create_menu_bar(bbbm);
-    gtk_widget_show(menu_bar);
-    gtk_box_pack_start(GTK_BOX(vbox), menu_bar, FALSE, FALSE, 0);
+    gtk_container_add(GTK_CONTAINER(bbbm->window), vbox);
+    menubar = bbbm_create_menubar(bbbm);
+    gtk_box_pack_start(GTK_BOX(vbox), menubar, FALSE, FALSE, 0);
     scroll = gtk_scrolled_window_new(NULL, NULL);
     gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(scroll),
-                                   GTK_POLICY_AUTOMATIC,
-                                   GTK_POLICY_AUTOMATIC);
+                                   GTK_POLICY_AUTOMATIC, GTK_POLICY_AUTOMATIC);
+    gtk_box_pack_start(GTK_BOX(vbox), scroll, TRUE, TRUE, 0);
     bbbm->table = gtk_table_new(1, 1, TRUE);
-    gtk_widget_show(bbbm->table);
     gtk_scrolled_window_add_with_viewport(GTK_SCROLLED_WINDOW(scroll),
                                           bbbm->table);
-    gtk_widget_show(scroll);
-    gtk_box_pack_start(GTK_BOX(vbox), scroll, TRUE, TRUE, 0);
     hbox = gtk_hbox_new(TRUE, 0);
-    bbbm->file_statusbar = gtk_statusbar_new();
-    gtk_statusbar_set_has_resize_grip(GTK_STATUSBAR(bbbm->file_statusbar),
-                                      FALSE);
-    gtk_widget_show(bbbm->file_statusbar);
-    gtk_box_pack_start(GTK_BOX(hbox), bbbm->file_statusbar, TRUE, TRUE, 0);
-    bbbm->image_statusbar = gtk_statusbar_new();
-    gtk_widget_show(bbbm->image_statusbar);
-    gtk_box_pack_start(GTK_BOX(hbox), bbbm->image_statusbar, TRUE, TRUE, 0);
-    gtk_widget_show(hbox);
-    gtk_box_pack_end(GTK_BOX(vbox), hbox, FALSE, FALSE, 0);
-    gtk_widget_show(vbox);
-    gtk_container_add(GTK_CONTAINER(bbbm->window), vbox);
-    gtk_widget_show(bbbm->window);
+    gtk_box_pack_start(GTK_BOX(vbox), hbox, FALSE, FALSE, 0);
+    bbbm->file_bar = gtk_statusbar_new();
+    gtk_statusbar_set_has_resize_grip(GTK_STATUSBAR(bbbm->file_bar), FALSE);
+    gtk_box_pack_start(GTK_BOX(hbox), bbbm->file_bar, TRUE, TRUE, 0);
+    bbbm->file_cid =
+       gtk_statusbar_get_context_id(GTK_STATUSBAR(bbbm->file_bar), "Filename");
+    gtk_statusbar_push(GTK_STATUSBAR(bbbm->file_bar), bbbm->file_cid,
+                       "Untitled");
+    bbbm->file_mod_cid =
+                    gtk_statusbar_get_context_id(GTK_STATUSBAR(bbbm->file_bar),
+                                                 "FilenameModified");
+    bbbm->image_bar = gtk_statusbar_new();
+    gtk_statusbar_set_has_resize_grip(GTK_STATUSBAR(bbbm->image_bar), TRUE);
+    gtk_box_pack_start(GTK_BOX(hbox), bbbm->image_bar, TRUE, TRUE, 0);
+    bbbm->image_cid =
+         gtk_statusbar_get_context_id(GTK_STATUSBAR(bbbm->image_bar), "Image");
+    gtk_widget_show_all(bbbm->window);
 
-    if (file)
+    if (file && !g_file_test(file, G_FILE_TEST_IS_REGULAR))
     {
-        if (g_file_test(file, G_FILE_TEST_IS_REGULAR))
-            bbbm_open_collection(bbbm, file);
-        else
-            fprintf(stderr, "bbbm: could not find '%s'\n", file);
+        gchar *message = g_strconcat("Could not open '", file, "'", NULL);
+        bbbm_dialogs_error(GTK_WINDOW(bbbm->window), message);
+        g_free(message);
     }
+    else if (file)
+        bbbm_open0(bbbm, file);
     return bbbm;
 }
 
 void bbbm_destroy(BBBM *bbbm)
 {
-    // bbbm_close should already been called when exiting the window,
-    // just like destroying the window.
-    // bbbm_close removes bbbm->images and bbbm->filename
+    /* closing the window already destroyed all fields */
     g_free(bbbm);
-    // bbbm->opts is the only remaining thing, but that is created outside
-    // the constructor; let it be destroyed there
-}
-
-void bbbm_statusbar_clear(BBBM *bbbm)
-{
-    guint context_id = gtk_statusbar_get_context_id(
-                          GTK_STATUSBAR(bbbm->image_statusbar), IMAGE_CONTEXT);
-    gtk_statusbar_pop(GTK_STATUSBAR(bbbm->image_statusbar), context_id);
-}
-
-void bbbm_reorder(BBBM *bbbm, guint index)
-{
-    GList *iter;
-    guint num_imgs = g_list_length(bbbm->images);
-    guint i;
-    guint cols, rows;
-    iter = g_list_nth(bbbm->images, index);
-    for (i = index; iter; iter = iter->next, ++i)
-    {
-        guint c, r;
-        gtk_container_remove(GTK_CONTAINER(bbbm->table),
-                             BBBM_IMAGE(iter->data)->box);
-        c = i % bbbm->opts->thumb_cols;
-        r = i / bbbm->opts->thumb_cols;
-        gtk_table_attach(GTK_TABLE(bbbm->table), BBBM_IMAGE(iter->data)->box,
-                         c, c + 1, r, r + 1, 0, 0,
-                         bbbm->padding, bbbm->padding);
-    }
-    cols = (bbbm->opts->thumb_cols < num_imgs ? bbbm->opts->thumb_cols :
-                                                num_imgs);
-    rows = num_imgs / bbbm->opts->thumb_cols +
-           (num_imgs % bbbm->opts->thumb_cols != 0);
-    gtk_table_resize(GTK_TABLE(bbbm->table),
-                     (rows > 1 ? rows : 1), (cols > 1 ? cols : 1));
-}
-
-void bbbm_resize_thumbs(BBBM *bbbm)
-{
-    GList *iter;
-    GList *old_imgs = bbbm->images;
-    bbbm->images = NULL;
-    for (iter = old_imgs; iter; iter = iter->next)
-    {
-        // steps to take: add new, destroy (removes from table)
-        bbbm_add_image0(bbbm, BBBM_IMAGE(iter->data)->filename,
-                        BBBM_IMAGE(iter->data)->description, -1);
-        bbbm_image_destroy(BBBM_IMAGE(iter->data));
-    }
-    g_list_free(old_imgs);
-}
-
-void bbbm_set_modified(BBBM *bbbm, gboolean modified)
-{
-    if (bbbm->modified == modified)
-        return;
-    bbbm->modified = modified;
-    if (modified)
-    {
-        if (bbbm->filename)
-        {
-            guint context_id = gtk_statusbar_get_context_id(
-                            GTK_STATUSBAR(bbbm->file_statusbar), FILE_CONTEXT);
-            gchar *filename = g_strconcat(bbbm->filename, "*", NULL);
-            gtk_statusbar_push(GTK_STATUSBAR(bbbm->file_statusbar), context_id,
-                               filename);
-            g_free(filename);
-        }
-    }
-    else
-    {
-        guint context_id = gtk_statusbar_get_context_id(
-                            GTK_STATUSBAR(bbbm->file_statusbar), FILE_CONTEXT);
-        bbbm->modified = FALSE;
-        // popping empty statusbar is ok
-        gtk_statusbar_pop(GTK_STATUSBAR(bbbm->file_statusbar), context_id);
-    }
-}
-
-static gint bbbm_save_to(BBBM *bbbm, const gchar *file)
-{
-    GList *iter;
-    FILE *f = fopen(file, "w");
-    if (!f)
-        return 1;
-    for (iter = bbbm->images; iter; iter = iter->next)
-        fprintf(f, "%s\n%s\n", BBBM_IMAGE(iter->data)->filename,
-                               BBBM_IMAGE(iter->data)->description);
-    fclose(f);
-    bbbm_set_modified(bbbm, FALSE);
-    // change filename
-    if (!bbbm->filename || strcmp(bbbm->filename, file))
-    {
-        guint context_id = gtk_statusbar_get_context_id(
-                            GTK_STATUSBAR(bbbm->file_statusbar), FILE_CONTEXT);
-        gtk_statusbar_pop(GTK_STATUSBAR(bbbm->file_statusbar), context_id);
-        g_free(bbbm->filename); // freeing NULL is ok
-        bbbm->filename = bbbm_util_absolute_path(file);
-        gtk_statusbar_push(GTK_STATUSBAR(bbbm->file_statusbar), context_id,
-                           bbbm->filename);
-    }
-    // else bbbm->filename == file
-    return 0;
-}
-
-static gint bbbm_create_list(BBBM *bbbm, const gchar *file)
-{
-    GList *iter;
-    FILE *f = fopen(file, "w");
-    if (!f)
-        return 1;
-    for (iter = bbbm->images; iter; iter = iter->next)
-        fprintf(f, "%s\n", BBBM_IMAGE(iter->data)->filename);
-    fclose(f);
-    return 0;
-}
-
-static gint bbbm_create_menu(BBBM *bbbm, const gchar *file)
-{
-    GList *iter;
-    FILE *f = fopen(file, "w");
-    if (!f)
-        return 1;
-    fprintf(f, "[submenu] (Backgrounds)\n");
-    for (iter = bbbm->images; iter; iter = iter->next)
-        bbbm_create_menu_item(f, bbbm->opts->set_command,
-                              BBBM_IMAGE(iter->data)->filename,
-                              BBBM_IMAGE(iter->data)->description);
-    fclose(f);
-    return 0;
-}
-
-static inline void bbbm_create_menu_item(FILE *file, const gchar *command,
-                                         const gchar *filename,
-                                         const gchar *description)
-{
-    fputs("  [exec] (", file);
-    while (*description)
-        switch (*description)
-        {
-            case '\\': // fallthrough
-            case '(': // fallthrough
-            case ')': // fallthrough
-            case '{': // fallthrough
-            case '}':
-                fputc('\\', file);
-                // fallthrough
-            default:
-                fputc(*description++, file);
-                break;
-        }
-    fputs(") {", file);
-    while (*command)
-        switch (*command)
-        {
-            case '\\': // fallthrough
-            case '(': // fallthrough
-            case ')': // fallthrough
-            case '{': // fallthrough
-            case '}':
-                fputc('\\', file);
-                // fallthrough
-            default:
-                fputc(*command++, file);
-                break;
-        }
-    fputs(" \"", file);
-    while (*filename)
-        switch (*filename)
-        {
-            case '\\': // fallthrough
-            case '(': // fallthrough
-            case ')': // fallthrough
-            case '{': // fallthrough
-            case '}':
-                fputc('\\', file);
-                // fallthrough
-            default:
-                fputc(*filename++, file);
-                break;
-        }
-    fputs("\"}\n", file);
-}
-
-static gint bbbm_compare_filename(gconstpointer image1, gconstpointer image2)
-{
-    return strcmp(BBBM_IMAGE(image1)->filename, BBBM_IMAGE(image2)->filename);
-}
-
-static gint bbbm_compare_description(gconstpointer image1,
-                                     gconstpointer image2)
-{
-    return strcmp(BBBM_IMAGE(image1)->description,
-                  BBBM_IMAGE(image2)->description);
-}
-
-static inline gboolean bbbm_can_close(BBBM *bbbm)
-{
-    if (bbbm->modified)
-    {
-        static const gchar *text = "Collection has been modified."
-                                   " Close anyway?";
-        gboolean result;
-        GtkWidget *dialog = gtk_message_dialog_new(GTK_WINDOW(bbbm->window), 0,
-                                                   GTK_MESSAGE_QUESTION,
-                                                   GTK_BUTTONS_YES_NO, text);
-        gtk_window_set_title(GTK_WINDOW(dialog), "Close collection?");
-        result = gtk_dialog_run(GTK_DIALOG(dialog)) == GTK_RESPONSE_YES;
-        gtk_widget_destroy(dialog);
-        return result;
-    }
-    return TRUE;
-}
-
-static inline void bbbm_close_collection(BBBM *bbbm)
-{
-    guint context_id = gtk_statusbar_get_context_id(
-                            GTK_STATUSBAR(bbbm->file_statusbar), FILE_CONTEXT);
-    while (bbbm->images)
-    {
-        BBBMImage* image = BBBM_IMAGE(bbbm->images->data);
-        bbbm->images = g_list_remove(bbbm->images, image);
-        bbbm_image_destroy(image);
-    }
-    g_free(bbbm->filename);
-    bbbm->filename = NULL;
-    bbbm_set_modified(bbbm, FALSE);
-    gtk_statusbar_pop(GTK_STATUSBAR(bbbm->file_statusbar), context_id);
-    bbbm_statusbar_clear(bbbm);
-}
-
-static inline gboolean bbbm_ask_overwrite(BBBM *bbbm, const gchar *file)
-{
-    gboolean result;
-    gchar *text = g_strconcat("File '", file, "' exists. Overwrite?", NULL);
-    GtkWidget *dialog = gtk_message_dialog_new(GTK_WINDOW(bbbm->window), 0,
-                                               GTK_MESSAGE_QUESTION,
-                                               GTK_BUTTONS_YES_NO, text);
-    gtk_window_set_title(GTK_WINDOW(dialog), "Overwrite?");
-    result = gtk_dialog_run(GTK_DIALOG(dialog)) == GTK_RESPONSE_YES;
-    gtk_widget_destroy(dialog);
-    g_free(text);
-    return result;
-}
-
-static inline void bbbm_error_message(BBBM *bbbm, const gchar *message)
-{
-    GtkWidget *dialog = gtk_message_dialog_new(GTK_WINDOW(bbbm->window), 0,
-                                               GTK_MESSAGE_ERROR,
-                                               GTK_BUTTONS_OK, message);
-    gtk_window_set_title(GTK_WINDOW(dialog), "Error");
-    gtk_dialog_run(GTK_DIALOG(dialog));
-    gtk_widget_destroy(dialog);
-}
-
-static inline gboolean bbbm_is_image(const gchar *file)
-{
-    const gchar *ext = bbbm_util_extension(file);
-    guint i;
-    if (!ext)
-        // ext is NULL, so no extensions
-        return FALSE;
-    for (i = 0; EXTENSIONS[i]; ++i)
-        if (!strcmp(ext, EXTENSIONS[i]))
-            return TRUE;
-    return FALSE;
-}
-
-static inline GtkWidget *create_chooser(BBBM *bbbm, const gchar *title,
-                                        gboolean mult, gboolean hide_op)
-{
-    GtkWidget *chooser;
-
-    bbbm_statusbar_clear(bbbm);
-    chooser = gtk_file_selection_new(title);
-    gtk_window_set_transient_for(GTK_WINDOW(chooser),
-                                 GTK_WINDOW(bbbm->window));
-    gtk_file_selection_set_select_multiple(GTK_FILE_SELECTION(chooser), mult);
-    if (hide_op)
-        gtk_file_selection_hide_fileop_buttons(GTK_FILE_SELECTION(chooser));
-    return chooser;
-}
-
-static inline void bbbm_execute(const gchar *command, gchar *file)
-{
-    if (!strcmp(command, ""))
-        return;
-    if (!fork())
-    {
-        // use X as a file to make sure it does not get split, replace later
-        gchar *com = g_strconcat(command, " X", NULL);
-        gchar **cmd = g_strsplit(com, " ", -1);
-        guint i;
-        g_free(com);
-        for (i = 0; cmd[i]; ++i)
-            ;
-        // cmd[i] == NULL, so cmd[i - 1] should be X
-        g_free(cmd[i - 1]);
-        // keep a copy of file, since we will free it if an error occurs!
-        cmd[i - 1] = g_strdup(file);
-        execvp(cmd[0], cmd);
-        g_strfreev(cmd);
-        fprintf(stderr, "bbbm: error executing '%s \"%s\"': %s\n",
-                command, file, g_strerror(errno));
-        // the child process will try to get back to the window, exit instead
-        exit(1);
-    }
-}
-
-static GtkWidget *bbbm_create_menu_bar(BBBM *bbbm)
-{
-    static guint num_items = 22;
-    static GtkItemFactoryEntry menu_items[] =
-    {
-        {"/_File", NULL, NULL, 0, "<Branch>"},
-        {"/File/_Open...", "<ctrl>O", bbbm_open, 0, NULL},
-        {"/File/_Save", "<ctrl>S", bbbm_save, 0, NULL},
-        {"/File/Save _As...", "<ctrl><shift>S", bbbm_create, BBBM_SAVE, NULL},
-        {"/File/_Close", "<ctrl>X", bbbm_close, 0, NULL},
-        {"/File/sep", NULL, NULL, 0, "<Separator>"},
-        {"/File/E_xit", "<alt>F4", bbbm_exit, 0, NULL},
-        {"/_Edit", NULL, NULL, 0, "<Branch>"},
-        {"/Edit/_Add Image...", "<ctrl>A", bbbm_add_image, 0, NULL},
-        {"/Edit/Add _Directory...", "<ctrl>D", bbbm_add_directory, 0, NULL},
-        {"/Edit/Add _Collection...", "<ctrl>C", bbbm_add_collection, 0, NULL},
-        {"/Edit/sep", NULL, NULL, 0, "<Separator>"},
-        {"/Edit/Sort On _Filename", "<ctrl><shift>F",
-         bbbm_sort_images, FILENAME_SORT, NULL},
-        {"/Edit/Sort On D_escription", "<ctrl><shift>D",
-         bbbm_sort_images, DESCRIPTION_SORT, NULL},
-        {"/_Tools", NULL, NULL, 0, "<Branch>"},
-        {"/Tools/Create _List...", "<ctrl>L", bbbm_create, BBBM_LIST, NULL},
-        {"/Tools/Create _Menu...", "<ctrl>M", bbbm_create, BBBM_MENU, NULL},
-        {"/Tools/_Random Background", "<ctrl>R",
-         bbbm_random_background, 0, NULL},
-        {"/Tools/sep", NULL, NULL, 0, "<Separator>"},
-        {"/Tools/_Options...", "<alt>P", bbbm_options_dialog, 0, NULL},
-        {"/_Help", NULL, NULL, 0, "<Branch>"},
-        {"/Help/_About", NULL, bbbm_about_dialog, 0, NULL}
-    };
-    GtkAccelGroup *accel_group = gtk_accel_group_new();
-    GtkItemFactory *item_factory = gtk_item_factory_new(GTK_TYPE_MENU_BAR,
-                                                        "<main>", accel_group);
-    gtk_item_factory_create_items(item_factory, num_items, menu_items, bbbm);
-    gtk_window_add_accel_group(GTK_WINDOW(bbbm->window), accel_group);
-    return gtk_item_factory_get_widget(item_factory, "<main>");
-}
-
-static gboolean bbbm_set_status(GtkWidget *widget, GdkEvent *event,
-                                BBBMImage *image)
-{
-    guint context_id = gtk_statusbar_get_context_id(
-                   GTK_STATUSBAR(image->bbbm->image_statusbar), IMAGE_CONTEXT);
-    gtk_statusbar_push(GTK_STATUSBAR(image->bbbm->image_statusbar), context_id,
-                                     image->description);
-    return FALSE;
-}
-
-static gboolean bbbm_clear_status(GtkWidget *widget, GdkEvent *event,
-                                  BBBM *bbbm)
-{
-    bbbm_statusbar_clear(bbbm);
-    return FALSE;
-}
-
-static void bbbm_open(BBBM *bbbm)
-{
-    GtkWidget *chooser;
-
-    if (!bbbm_can_close(bbbm))
-        return;
-    chooser = create_chooser(bbbm, "Open a collection",
-                                        FALSE, TRUE);
-    while (gtk_dialog_run(GTK_DIALOG(chooser)) == GTK_RESPONSE_OK)
-    {
-        gchar *file = bbbm_util_absolute_path(
-                 gtk_file_selection_get_filename(GTK_FILE_SELECTION(chooser)));
-        if (g_file_test(file, G_FILE_TEST_IS_REGULAR))
-        {
-            bbbm_open_collection(bbbm, file);
-            g_free(file);
-            break;
-        }
-        else
-        {
-            gchar *dir = NULL;
-            if (g_file_test(file, G_FILE_TEST_IS_DIR))
-                dir = g_strconcat(file, "/", NULL);
-            else if (!g_file_test(file, G_FILE_TEST_EXISTS))
-                dir = bbbm_util_dirname(file);
-            gtk_file_selection_set_filename(GTK_FILE_SELECTION(chooser), dir);
-            g_free(dir);
-        }
-        g_free(file);
-    }
-    gtk_widget_destroy(chooser);    
-}
-
-static void bbbm_open_collection(BBBM *bbbm, const gchar *file)
-{
-    guint context_id = gtk_statusbar_get_context_id(
-                            GTK_STATUSBAR(bbbm->file_statusbar), FILE_CONTEXT);
-    // first close the current file, then set filename and add new
-    bbbm_close_collection(bbbm);
-    bbbm->filename = bbbm_util_absolute_path(file);
-    gtk_statusbar_push(GTK_STATUSBAR(bbbm->file_statusbar), context_id,
-                       bbbm->filename);
-    bbbm_add_collection0(bbbm, file);
-    // add_collection0 will have set modified to TRUE and pushed, so pop
-    bbbm_set_modified(bbbm, FALSE);
-}
-
-static void bbbm_save(BBBM *bbbm)
-{
-    if (bbbm->filename)
-    {
-        if (bbbm_save_to(bbbm, bbbm->filename))
-        {
-            gchar *message = g_strconcat("Could not save to '", bbbm->filename,
-                                         "'", NULL);
-            bbbm_error_message(bbbm, message);
-            fprintf(stderr, "bbbm: could save to '%s'\n", bbbm->filename);
-            g_free(message);
-        }
-    }
-    else
-        bbbm_create(bbbm, BBBM_SAVE);
-}
-
-static void bbbm_close(BBBM *bbbm)
-{
-    if (!bbbm_can_close(bbbm))
-        return;
-    bbbm_close_collection(bbbm);
 }
 
 static gboolean bbbm_exit_window(GtkWidget *widget, GdkEvent *event,
                                  BBBM *bbbm)
 {
     if (!bbbm_can_close(bbbm))
-        // block other handlers, like closing the window!
+        /* block other handlers, like closing the window! */
         return TRUE;
-    bbbm_close_collection(bbbm);
+    bbbm_close0(bbbm);
     gtk_widget_destroy(bbbm->window);
     gtk_main_quit();
     return FALSE;
 }
 
-static void bbbm_exit(BBBM *bbbm)
+static void bbbm_open(BBBM *bbbm)
 {
+    gchar *filename;
+
     if (!bbbm_can_close(bbbm))
         return;
-    bbbm_close_collection(bbbm);
-    gtk_widget_destroy(bbbm->window);
-    gtk_main_quit();
+    filename = bbbm_dialogs_get_file(GTK_WINDOW(bbbm->window),
+                                     "Open a collection");
+    if (filename)
+    {
+        bbbm_open0(bbbm, filename);
+        g_free(filename);
+    }
+}
+
+static inline gboolean bbbm_open0(BBBM *bbbm, const gchar *filename)
+{
+    bbbm_close0(bbbm);
+    if (bbbm_add_collection0(bbbm, filename))
+    {
+        bbbm_set_modified(bbbm, FALSE);
+        bbbm->filename = bbbm_util_absolute_path(filename);
+        gtk_statusbar_pop(GTK_STATUSBAR(bbbm->file_bar), bbbm->file_cid);
+        gtk_statusbar_push(GTK_STATUSBAR(bbbm->file_bar), bbbm->file_cid,
+                           bbbm->filename);
+        return TRUE;
+    }
+    else
+    {
+        gchar *message = g_strconcat("Could not open '", filename,
+                                     "' propertly", NULL);
+        bbbm_dialogs_error(GTK_WINDOW(bbbm->window), message);
+        g_free(message);
+        /* some images might be added, remove them */
+        bbbm_close0(bbbm);
+        return FALSE;
+    }
+}
+
+static void bbbm_save(BBBM *bbbm)
+{
+    if (bbbm->filename && !bbbm_save_as0(bbbm, bbbm->filename))
+    {
+        gchar *message = g_strconcat("Could not save '", bbbm->filename, "'",
+                                     NULL);
+        bbbm_dialogs_error(GTK_WINDOW(bbbm->window), message);
+        g_free(message);
+    }
+    else if (!bbbm->filename)
+        bbbm_save_as(bbbm);
+}
+
+static void bbbm_save_as(BBBM *bbbm)
+{
+    bbbm_dialogs_save(GTK_WINDOW(bbbm->window), "Save collection as",
+                      (save_function)bbbm_save_as0, bbbm);
+}
+
+static gboolean bbbm_save_as0(BBBM *bbbm, const gchar *filename)
+{
+    GList *iter;
+    FILE *file;
+
+    /* first save, in case any error occurs */
+    if (!(file = fopen(filename, "w")))
+        return FALSE;
+    for (iter = bbbm->images; iter; iter = iter->next)
+        fprintf(file, "%s\n%s\n",
+                bbbm_image_get_filename(BBBM_IMAGE(iter->data)),
+                bbbm_image_get_description(BBBM_IMAGE(iter->data)));
+    fclose(file);
+    bbbm_set_modified(bbbm, FALSE);
+    if (!bbbm->filename || strcmp(filename, bbbm->filename))
+    {
+        gtk_statusbar_pop(GTK_STATUSBAR(bbbm->file_bar), bbbm->file_cid);
+        g_free(bbbm->filename);
+        bbbm->filename = bbbm_util_absolute_path(filename);
+        gtk_statusbar_push(GTK_STATUSBAR(bbbm->file_bar), bbbm->file_cid,
+                           bbbm->filename);
+    }
+    return TRUE;
+}
+
+static void bbbm_close(BBBM *bbbm)
+{
+    if (bbbm_can_close(bbbm))
+        bbbm_close0(bbbm);
+}
+
+static inline void bbbm_close0(BBBM *bbbm)
+{
+    while (bbbm->images)
+    {
+        BBBMImage *image = BBBM_IMAGE(bbbm->images->data);
+        bbbm->images = g_list_remove(bbbm->images, image);
+        bbbm_image_destroy(image);
+    }
+    g_free(bbbm->filename);
+    bbbm->filename = NULL;
+    bbbm_set_modified(bbbm, FALSE);
+    gtk_statusbar_pop(GTK_STATUSBAR(bbbm->file_bar), bbbm->file_cid);
+    gtk_statusbar_push(GTK_STATUSBAR(bbbm->file_bar), bbbm->file_cid,
+                       "Untitled");
+}
+
+static void bbbm_exit(BBBM *bbbm)
+{
+    g_signal_emit_by_name(G_OBJECT(bbbm->window), "delete-event", NULL, bbbm);
 }
 
 static void bbbm_add_image(BBBM *bbbm)
 {
-    GtkWidget *chooser = create_chooser(bbbm, "Add images", TRUE, TRUE);
-    while (gtk_dialog_run(GTK_DIALOG(chooser)) == GTK_RESPONSE_OK)
+    GList *files = bbbm_dialogs_get_files(GTK_WINDOW(bbbm->window),
+                                          "Add images");
+    while (files)
     {
-        guint i;
-        gchar **files = gtk_file_selection_get_selections(
-                                                  GTK_FILE_SELECTION(chooser));
-        if (!files || !files[0] ||
-            !g_file_test(files[0], G_FILE_TEST_IS_REGULAR))
-            // either no files, or a directory, or non-existing
-        {
-            if (files && files[0])
+        gchar *file = (gchar *)files->data;
+        files = g_list_remove(files, file);
+        if (bbbm_util_is_image(file))
+            if (!bbbm_add_image0(bbbm, file, NULL, -1))
             {
-                gchar *dir = NULL;
-                if (g_file_test(files[0], G_FILE_TEST_IS_DIR))
-                    dir = g_strconcat(files[0], "/", NULL);
-                else if (!g_file_test(files[0], G_FILE_TEST_EXISTS))
-                    dir = bbbm_util_dirname(files[0]);
-                gtk_file_selection_set_filename(GTK_FILE_SELECTION(chooser),
-                                                dir);
-                g_free(dir);
+                gchar *message = g_strconcat("Could not add image '", file,
+                                             "'", NULL);
+                bbbm_dialogs_error(GTK_WINDOW(bbbm->window), message);
+                g_free(message);
             }
-            g_strfreev(files);
-            continue;
-        }
-        for (i = 0; files[i]; ++i)
-        {
-            if (g_file_test(files[i], G_FILE_TEST_IS_REGULAR) &&
-                bbbm_is_image(files[i]))
-            {
-                gchar *absfile = bbbm_util_absolute_path(files[i]);
-                bbbm_add_image0(bbbm, absfile, NULL, -1);
-                g_free(absfile);
-            }
-        }
-        g_strfreev(files);
-        break;
+        g_free(file);
     }
-    gtk_widget_destroy(chooser);
 }
 
-static void bbbm_add_image0(BBBM *bbbm, gchar *filename, gchar *description,
-                            gint index)
+static gboolean bbbm_add_image0(BBBM *bbbm, const gchar *filename,
+                                const gchar *description, gint index)
 {
-    gchar *thumb, *thumb_dir;
-    pid_t pid;
+    gchar *thumb, *thumbdir, *command;
+    BBBMImage *image;
+    guint col, row;
 
     if (!description)
         description = filename;
-    thumb = g_strconcat(bbbm->thumbsdir, "/", filename, NULL);
-    thumb_dir = g_path_get_dirname(thumb);
-    // makedir will also create bbbm->thumbsdir if it didn't exist yet
-    bbbm_util_makedirs(thumb_dir);
-    g_free(thumb_dir);
-
-    if ((pid = fork()) == 0)
-        execlp("convert", "convert", "-size", bbbm->opts->thumb_size,
-               "-resize", bbbm->opts->thumb_size, filename, thumb, NULL);
-    else if (pid > 0)
+    thumb = g_strconcat(bbbm->thumbdir, "/", filename, NULL);
+    thumbdir = g_path_get_dirname(thumb);
+    if (bbbm_util_makedirs(thumbdir))
     {
-        BBBMImage *image;
-        guint col, row;
-        waitpid(pid, NULL, 0);
-        image = bbbm_image_new(bbbm, filename, description, thumb);
-        gtk_signal_connect(GTK_OBJECT(BBBM_IMAGE(image)->box),
-                           "button-press-event", 
-                           GTK_SIGNAL_FUNC(bbbm_set_image), image);
-        gtk_signal_connect(GTK_OBJECT(BBBM_IMAGE(image)->box),
-                           "button-release-event",
-                           GTK_SIGNAL_FUNC(bbbm_popup), image);
-        gtk_signal_connect(GTK_OBJECT(BBBM_IMAGE(image)->box),
-                           "enter-notify-event",
-                           GTK_SIGNAL_FUNC(bbbm_set_status), image);
-        gtk_signal_connect(GTK_OBJECT(BBBM_IMAGE(image)->box),
-                           "leave-notify-event",
-                           GTK_SIGNAL_FUNC(bbbm_clear_status), image->bbbm);
-        gtk_widget_show(BBBM_IMAGE(image)->box);
-        // we might remove it from the table, so increase refcount
-        g_object_ref(BBBM_IMAGE(image)->box);
-        if (index == -1)
-        {
-            guint img_num = g_list_length(bbbm->images);
-            col = img_num % bbbm->opts->thumb_cols;
-            row = img_num / bbbm->opts->thumb_cols;
-            bbbm->images = g_list_append(bbbm->images, image);
-        }
-        else
-        {
-            col = index % bbbm->opts->thumb_cols;
-            row = index / bbbm->opts->thumb_cols;
-            bbbm->images = g_list_insert(bbbm->images, image, index);
-            bbbm_reorder(bbbm, index + 1);
-        }
-        gtk_table_attach(GTK_TABLE(bbbm->table), BBBM_IMAGE(image)->box,
-                         col, col + 1, row, row + 1, 0, 0, 
-                         bbbm->padding, bbbm->padding);
-        bbbm_set_modified(bbbm, TRUE);
+        fprintf(stderr, "bbbm: could not create directory '%s': %s\n",
+                thumbdir, g_strerror(errno));
+        g_free(thumbdir);
+        g_free(thumb);
+        return FALSE;
+    }
+    g_free(thumbdir);
+
+    command = g_strconcat("convert -size ", bbbm->opts->thumb_size,
+                          " -resize ", bbbm->opts->thumb_size, " \"", filename,
+                          "\" \"", thumb, "\"", NULL);
+    if (system(command))
+    {
+        g_free(thumb);
+        g_free(command);
+        return FALSE;
+    }
+    g_free(command);
+
+    image = bbbm_image_new(bbbm, filename, description, thumb);
+    g_free(thumb);
+    g_signal_connect(G_OBJECT(image->box), "button-press-event",
+                     G_CALLBACK(bbbm_set_image), image);
+    g_signal_connect(G_OBJECT(image->box), "button-release-event",
+                     G_CALLBACK(bbbm_popup), image);
+    g_signal_connect(G_OBJECT(image->box), "enter-notify-event",
+                     G_CALLBACK(bbbm_set_status), image);
+    g_signal_connect(G_OBJECT(image->box), "leave-notify-event",
+                     G_CALLBACK(bbbm_clear_status), image);
+    gtk_widget_show(image->box);
+    g_object_ref(image->box);
+    if (index == -1)
+    {
+        guint img_num = g_list_length(bbbm->images);
+        col = img_num % bbbm->opts->thumb_cols;
+        row = img_num / bbbm->opts->thumb_cols;
+        bbbm->images = g_list_append(bbbm->images, image);
     }
     else
-        bbbm_error_message(bbbm, "Could not create thumb");
-    g_free(thumb);
+    {
+        col = index % bbbm->opts->thumb_cols;
+        row = index / bbbm->opts->thumb_cols;
+        bbbm->images = g_list_insert(bbbm->images, image, index);
+        bbbm_reset_images(bbbm, index + 1);
+    }
+    gtk_table_attach(GTK_TABLE(bbbm->table), image->box,
+                     col, col + 1, row, row + 1, 0, 0, PADDING, PADDING);
+    bbbm_set_modified(bbbm, TRUE);
+    return TRUE;
 }
 
 static void bbbm_add_directory(BBBM *bbbm)
 {
-    GtkWidget *chooser = create_chooser(bbbm, "Add a directory", FALSE, TRUE);
-    while (gtk_dialog_run(GTK_DIALOG(chooser)) == GTK_RESPONSE_OK)
+    GList *files = bbbm_dialogs_get_files_dir(GTK_WINDOW(bbbm->window),
+                                              "Add a directory");
+    while (files)
     {
-        gchar *file = bbbm_util_absolute_path(
-                 gtk_file_selection_get_filename(GTK_FILE_SELECTION(chooser)));
-        if (!g_file_test(file, G_FILE_TEST_IS_DIR))
-        {
-            gchar *dir = bbbm_util_dirname(file);
-            gtk_file_selection_set_filename(GTK_FILE_SELECTION(chooser), dir);
-            g_free(dir);
-            g_free(file);
-            continue;
-        }
-        if (g_file_test(file, G_FILE_TEST_EXISTS))
-        {
-            // listdir already returns absolute files
-            GList *files = bbbm_util_listdir(file);
-            while (files)
+        gchar *file = (gchar *)files->data;
+        files = g_list_remove(files, file);
+        if (bbbm_util_is_image(file))
+            if (!bbbm_add_image0(bbbm, file, NULL, -1))
             {
-                gchar *file = (gchar *)files->data;
-                files = g_list_remove(files, file);
-                if (bbbm_is_image(file))
-                    bbbm_add_image0(bbbm, file, file, -1);
-                // the string is copied inside bbbm_add_image0, so free it
-                g_free(file);
+                gchar *message = g_strconcat("Could not add image '", file,
+                                             "'", NULL);
+                bbbm_dialogs_error(GTK_WINDOW(bbbm->window), message);
+                g_free(message);
             }
-            g_free(file);
-            break;
-        }
         g_free(file);
     }
-    gtk_widget_destroy(chooser);
 }
 
 static void bbbm_add_collection(BBBM *bbbm)
 {
-    GtkWidget *chooser = create_chooser(bbbm, "Add collections", TRUE, TRUE);
-    while (gtk_dialog_run(GTK_DIALOG(chooser)) == GTK_RESPONSE_OK)
+    GList *files = bbbm_dialogs_get_files(GTK_WINDOW(bbbm->window),
+                                              "Add collections");
+    while (files)
     {
-        guint i;
-        gchar **files = gtk_file_selection_get_selections(
-                                                  GTK_FILE_SELECTION(chooser));
-        if (!files || !files[0] ||
-            !g_file_test(files[0], G_FILE_TEST_IS_REGULAR))
-            // either no files, or a directory, or non-existing
+        gchar *file = (gchar *)files->data;
+        files = g_list_remove(files, file);
+        if (!bbbm_add_collection0(bbbm, file))
         {
-            if (files && files[0])
-            {
-                gchar *dir = NULL;
-                if (g_file_test(files[0], G_FILE_TEST_IS_DIR))
-                    dir = g_strconcat(files[0], "/", NULL);
-                else if (!g_file_test(files[0], G_FILE_TEST_EXISTS))
-                    dir = bbbm_util_dirname(files[0]);
-                gtk_file_selection_set_filename(GTK_FILE_SELECTION(chooser),
-                                                dir);
-                g_free(dir);
-            }
-            g_strfreev(files);
-            continue;
-        }
-        for (i = 0; files[i]; ++i)
-        {
-            if (g_file_test(files[i], G_FILE_TEST_IS_REGULAR))
-                bbbm_add_collection0(bbbm, files[i]);
-        }
-        g_strfreev(files);
-        break;
-    }
-    gtk_widget_destroy(chooser);
-}
-
-static void bbbm_add_collection0(BBBM *bbbm, const gchar *file)
-{
-    gchar filename[PATH_MAX], description[PATH_MAX];
-    FILE *f = fopen(file, "r");
-    if (!f)
-        return;
-    while (fgets(filename, PATH_MAX, f))
-    {
-        filename[strlen(filename) - 1] = 0;
-        if (!fgets(description, PATH_MAX, f))
-            strcpy(description, filename);
-        else
-            description[strlen(description) - 1] = 0;
-        if (g_file_test(filename, G_FILE_TEST_IS_REGULAR) &&
-            bbbm_is_image(filename))
-            bbbm_add_image0(bbbm, filename, description, -1);
-    }
-    fclose(f);
-}
-
-static void bbbm_create(BBBM *bbbm, gint type)
-{
-    create_func func;
-    GtkWidget *chooser = NULL;
-    switch (type)
-    {
-        case BBBM_SAVE:
-            chooser = create_chooser(bbbm, "Save collection as",
-                                     FALSE, FALSE);
-            func = bbbm_save_to;
-            break;
-        case BBBM_LIST:
-            chooser = create_chooser(bbbm, "Create background list",
-                                     FALSE, FALSE);
-            func = bbbm_create_list;
-            break;
-        case BBBM_MENU:
-            chooser = create_chooser(bbbm, "Create background menu",
-                                     FALSE, FALSE);
-            func = bbbm_create_menu;
-            break;
-        default:
-            return;
-    }
-    while (gtk_dialog_run(GTK_DIALOG(chooser)) == GTK_RESPONSE_OK)
-    {
-        gchar *file = bbbm_util_absolute_path(
-                 gtk_file_selection_get_filename(GTK_FILE_SELECTION(chooser)));
-        if (!g_file_test(file, G_FILE_TEST_EXISTS) ||
-            (g_file_test(file, G_FILE_TEST_IS_REGULAR) &&
-             bbbm_ask_overwrite(bbbm, file)))
-        {
-            if (func(bbbm, file))
-            {
-                gchar *message = g_strconcat("Could not save to '", file, "'",
-                                             NULL);
-                bbbm_error_message(bbbm, message);
-                g_free(message);
-            }
-            else
-            {
-                g_free(file);
-                break;
-            }
-        }
-        else
-        {
-            // is a dir or could not overwrite; set path
-            gchar *dir;
-            if (g_file_test(file, G_FILE_TEST_IS_DIR))
-                dir = g_strconcat(file, "/", NULL);
-            else
-                dir = bbbm_util_dirname(file);
-            gtk_file_selection_set_filename(GTK_FILE_SELECTION(chooser), dir);
-            g_free(dir);
+            gchar *message = g_strconcat("Could not add collection '", file,
+                                         "' properly", NULL);
+            bbbm_dialogs_error(GTK_WINDOW(bbbm->window), message);
+            g_free(message);
         }
         g_free(file);
     }
-    gtk_widget_destroy(chooser);
+}
+
+static gboolean bbbm_add_collection0(BBBM *bbbm, const gchar *filename)
+{
+    gboolean result = TRUE;
+
+    gchar file[PATH_MAX], desc[PATH_MAX];
+    FILE *f = fopen(filename, "r");
+    if (!file)
+        return FALSE;
+    while (fgets(file, PATH_MAX, f))
+    {
+        g_strstrip(file);
+        if (fgets(desc, PATH_MAX, f))
+            g_strstrip(desc);
+        else
+            strcpy(desc, file);
+        if (bbbm_util_is_image(file))
+            result = result && bbbm_add_image0(bbbm, file, desc, -1);
+        else
+            result = FALSE;
+    }
+    fclose(f);
+    return result;
+}
+
+static void bbbm_sort_filename(BBBM *bbbm)
+{
+    if (!bbbm->images)
+        return;
+    bbbm->images = g_list_sort(bbbm->images,
+                               (GCompareFunc)bbbm_image_compare_filename);
+    bbbm_reset_images(bbbm, 0);
+    bbbm_set_modified(bbbm, TRUE);
+}
+
+static void bbbm_sort_description(BBBM *bbbm)
+{
+    if (!bbbm->images)
+        return;
+    bbbm->images = g_list_sort(bbbm->images,
+                               (GCompareFunc)bbbm_image_compare_description);
+    bbbm_reset_images(bbbm, 0);
+    bbbm_set_modified(bbbm, TRUE);
+}
+
+static void bbbm_create_list(BBBM *bbbm)
+{
+    bbbm_dialogs_save(GTK_WINDOW(bbbm->window), "Create background list",
+                      (save_function)bbbm_create_list0, bbbm);
+}
+
+static gboolean bbbm_create_list0(BBBM *bbbm, const gchar *filename)
+{
+    GList *iter;
+    FILE *file = fopen(filename, "w");
+    if (!file)
+        return FALSE;
+    for (iter = bbbm->images; iter; iter = iter->next)
+        fprintf(file, "%s\n", bbbm_image_get_filename(BBBM_IMAGE(iter->data)));
+    fclose(file);
+    return TRUE;
+}
+
+static void bbbm_create_menu(BBBM *bbbm)
+{
+    bbbm_dialogs_save(GTK_WINDOW(bbbm->window), "Create background menu",
+                      (save_function)bbbm_create_menu0, bbbm);
+}
+
+static gboolean bbbm_create_menu0(BBBM *bbbm, const gchar *filename)
+{
+    GList *iter;
+    FILE *file = fopen(filename, "w");
+    if (!file)
+        return FALSE;
+    fprintf(file, "[submenu] (");
+    if (bbbm->filename &&
+        (bbbm->opts->filename_label || bbbm->opts->filename_title))
+    {
+        gchar *name = g_path_get_basename(bbbm->filename);
+        if (bbbm->opts->filename_label)
+        {
+            bbbm_write_string(file, name);
+            fprintf(file, ")");
+        }
+        else
+            fprintf(file, "Backgrounds)");
+        if (bbbm->opts->filename_title)
+        {
+            fprintf(file, " {");
+            bbbm_write_string(file, name);
+            fprintf(file, "}\n");
+        }
+        else
+            fprintf(file, "\n");
+        g_free(name);
+    }
+    else
+        fprintf(file, "Backgrounds)\n");
+    for (iter = bbbm->images; iter; iter = iter->next)
+    {
+        fprintf(file, "  [exec] (");
+        bbbm_write_string(file,
+                          bbbm_image_get_description(BBBM_IMAGE(iter->data)));
+        fprintf(file, ") {");
+        bbbm_write_string(file, bbbm->opts->set_cmd);
+        fprintf(file, " \"");
+        bbbm_write_string(file,
+                          bbbm_image_get_filename(BBBM_IMAGE(iter->data)));
+        fprintf(file, "\"}\n");
+    }
+    fclose(file);
+    return TRUE;
+}
+
+static inline void bbbm_write_string(FILE *file, const gchar *string)
+{
+    while (*string)
+        switch (*string)
+        {
+            case '\\': /* fallthrough */
+            case '(': /* fallthrough */
+            case ')': /* fallthrough */
+            case '{': /* fallthrough */
+            case '}':
+                fputc('\\', file); 
+                /* fallthrough */
+            default:
+                fputc(*string++, file);
+                break;
+        }
 }
 
 static void bbbm_random_background(BBBM *bbbm)
@@ -873,33 +531,137 @@ static void bbbm_random_background(BBBM *bbbm)
         GRand *rand = g_rand_new();
         guint32 index = g_rand_int_range(rand, 0, g_list_length(bbbm->images));
         BBBMImage *image = BBBM_IMAGE(g_list_nth_data(bbbm->images, index));
-        bbbm_set(image);
+        bbbm_util_execute(bbbm->opts->set_cmd, bbbm_image_get_filename(image));
         g_rand_free(rand);
     }
 }
 
-static void bbbm_sort_images(BBBM *bbbm, gint field)
+static void bbbm_options(BBBM *bbbm)
 {
-    switch (field)
-    {
-        case FILENAME_SORT:
-            bbbm->images = g_list_sort(bbbm->images, bbbm_compare_filename);
-            break;
-        case DESCRIPTION_SORT:
-            bbbm->images = g_list_sort(bbbm->images, bbbm_compare_description);
-            break;
-        default:
-            return;
-    }
-    bbbm_reorder(bbbm, 0);
-    bbbm_set_modified(bbbm, TRUE);
+    guint changed = bbbm_dialogs_options(GTK_WINDOW(bbbm->window), bbbm->opts);
+    if (changed & OPTIONS_THUMB_SIZE_CHANGED)
+        bbbm_resize_thumbs(bbbm);
+    if (changed & OPTIONS_THUMB_COLS_CHANGED)
+        bbbm_reset_images(bbbm, 0);
+    if (changed)
+        bbbm_options_write(bbbm->opts, bbbm->config);
 }
 
-static gboolean bbbm_set_image(GtkWidget *widget, GdkEvent *event,
+static void bbbm_about(BBBM *bbbm)
+{
+    bbbm_dialogs_about(GTK_WINDOW(bbbm->window));
+}
+
+static inline GtkWidget *bbbm_create_menubar(BBBM *bbbm)
+{
+    static guint n_items = 22;
+    static GtkItemFactoryEntry items[] =
+    {
+        {"/_File", NULL, NULL, 0, "<Branch>"},
+        {"/File/_Open...", "<ctrl>O", bbbm_open, 0, NULL},
+        {"/File/_Save", "<ctrl>S", bbbm_save, 0, NULL},
+        {"/File/Save _As...", "<ctrl><shift>S", bbbm_save_as, 0, NULL},
+        {"/File/_Close", "<ctrl>X", bbbm_close, 0, NULL},
+        {"/File/sep", NULL, NULL, 0, "<Separator>"},
+        {"/File/E_xit", "<alt>F4", bbbm_exit, 0, NULL},
+        {"/_Edit", NULL, NULL, 0, "<Branch>"},
+        {"/Edit/_Add Images...", "<ctrl>A", bbbm_add_image, 0, NULL},
+        {"/Edit/Add _Directory...", "<ctrl>D", bbbm_add_directory, 0, NULL},
+        {"/Edit/Add _Collections...", "<ctrl>C", bbbm_add_collection, 0, NULL},
+        {"/Edit/sep", NULL, NULL, 0, "<Separator>"},
+        {"/Edit/Sort On _Filename", "<ctrl><shift>F",
+         bbbm_sort_filename, 0, NULL},
+        {"/Edit/Sort On D_escription", "<ctrl><shift>D",
+         bbbm_sort_description, 0, NULL},
+        {"/_Tools", NULL, NULL, 0, "<Branch>"},
+        {"/Tools/Create _List...", "<ctrl>L", bbbm_create_list, 0, NULL},
+        {"/Tools/Create _Menu...", "<ctrl>M", bbbm_create_menu, 0, NULL},
+        {"/Tools/_Random Background", "<ctrl>R",
+         bbbm_random_background, 0, NULL},
+        {"/Tools/sep", NULL, NULL, 0, "<Separator>"},
+        {"/Tools/_Options...", "<alt>P", bbbm_options, 0, NULL},
+        {"/_Help", NULL, NULL, 0, "<Branch>"},
+        {"/Help/_About", NULL, bbbm_about, 0, NULL}
+    };
+    GtkAccelGroup *accel_group = gtk_accel_group_new();
+    GtkItemFactory *factory = gtk_item_factory_new(GTK_TYPE_MENU_BAR, "<main>",
+                                                   accel_group);
+    gtk_item_factory_create_items(factory, n_items, items, bbbm);
+    gtk_window_add_accel_group(GTK_WINDOW(bbbm->window), accel_group);
+    return gtk_item_factory_get_widget(factory, "<main>");
+}
+
+static gboolean bbbm_can_close(BBBM *bbbm)
+{
+    if (bbbm->modified)
+    {
+        static const gchar *text = "Colletion has been modified. "
+                                   "Close anyway?";
+        return bbbm_dialogs_question(GTK_WINDOW(bbbm->window),
+                                     "Close collection?", text);
+    }
+    return TRUE;
+}
+
+static void bbbm_set_modified(BBBM *bbbm, gboolean modified)
+{
+    if (modified == bbbm->modified)
+        return;
+    if ((bbbm->modified = modified) && bbbm->filename)
+    {
+        gchar *filename = g_strconcat(bbbm->filename, "*", NULL);
+        gtk_statusbar_push(GTK_STATUSBAR(bbbm->file_bar), bbbm->file_mod_cid,
+                           filename);
+        g_free(filename);
+    }
+    else if (bbbm->modified)
+        gtk_statusbar_push(GTK_STATUSBAR(bbbm->file_bar), bbbm->file_mod_cid,
+                           "Untitled*");
+    else
+        gtk_statusbar_pop(GTK_STATUSBAR(bbbm->file_bar), bbbm->file_mod_cid);
+}
+
+static void bbbm_reset_images(BBBM *bbbm, guint index)
+{
+    GList *iter = g_list_nth(bbbm->images, index);
+    guint num_imgs = g_list_length(bbbm->images);
+    guint num_cols = bbbm->opts->thumb_cols;
+    guint cols = MIN(num_cols, num_imgs);
+    guint rows = num_imgs / num_cols + (num_imgs % num_cols == 0 ? 0 : 1);
+    for ( ; iter; iter = iter->next, ++index)
+    {
+        guint c = index % num_cols;
+        guint r = index / num_cols;
+        gtk_container_remove(GTK_CONTAINER(bbbm->table),
+                             BBBM_IMAGE(iter->data)->box);
+        gtk_table_attach(GTK_TABLE(bbbm->table), BBBM_IMAGE(iter->data)->box,
+                         c, c + 1, r, r + 1, 0, 0, PADDING, PADDING);
+    }
+    gtk_table_resize(GTK_TABLE(bbbm->table), MAX(rows, 1), MAX(cols, 1));
+}
+
+static void bbbm_resize_thumbs(BBBM *bbbm)
+{
+    gboolean was_modified = bbbm->modified;
+    GList *old = bbbm->images;
+    bbbm->images = NULL;
+    while (old)
+    {
+        BBBMImage *image = BBBM_IMAGE(old->data);
+        old = g_list_remove(old, image);
+        bbbm_add_image0(bbbm, bbbm_image_get_filename(image),
+                        bbbm_image_get_description(image), -1);
+        bbbm_image_destroy(image);
+    }
+    bbbm_set_modified(bbbm, was_modified);
+}
+
+static gboolean bbbm_set_image(GtkWidget *widget, GdkEventButton *event,
                                BBBMImage *image)
 {
-    if (event->type == GDK_2BUTTON_PRESS)
-        bbbm_set(image);
+    if (event->type == GDK_2BUTTON_PRESS && event->button == 1)
+        bbbm_util_execute(image->bbbm->opts->set_cmd,
+                          bbbm_image_get_filename(image));
     return FALSE;
 }
 
@@ -910,8 +672,8 @@ static gboolean bbbm_popup(GtkWidget *widget, GdkEventButton *event,
     {
         GtkWidget *popup;
         gint index = g_list_index(image->bbbm->images, image);
-        guint num_items = 9;
-        GtkItemFactoryEntry menu_items[] =
+        static guint n_items = 9;
+        GtkItemFactoryEntry items[] =
         {
             {"/_Set", NULL, bbbm_set, 0, NULL},
             {"/_View", NULL, bbbm_view, 0, NULL},
@@ -919,104 +681,131 @@ static gboolean bbbm_popup(GtkWidget *widget, GdkEventButton *event,
             {"/Move _Back...", NULL, bbbm_move_back, index, NULL},
             {"/Move _Forward...", NULL, bbbm_move_forward, index, NULL},
             {"/sep", NULL, NULL, 0, "<Separator>"},
-            {"/_Edit Description...", NULL, bbbm_edit_description_dialog,
-             0, NULL},
-            {"/_Insert...", NULL, bbbm_insert, 0, NULL},
-            {"/_Delete", NULL, bbbm_delete, 0, NULL}
+            {"/_Edit Description...", NULL, bbbm_edit, 0, NULL},
+            {"/_Insert Images..", NULL, bbbm_insert, index, NULL},
+            {"/_Delete", NULL, bbbm_delete, index, NULL}
         };
-        GtkItemFactory *item_factory = gtk_item_factory_new(GTK_TYPE_MENU,
-                                                            "<popup>", NULL);
-        gtk_item_factory_create_items(item_factory, num_items, menu_items,
-                                      image);
-        popup = gtk_item_factory_get_widget(item_factory, "<popup>");
+        GtkItemFactory *factory = gtk_item_factory_new(GTK_TYPE_MENU,
+                                                       "<popup>", NULL);
+        gtk_item_factory_create_items(factory, n_items, items, image);
+        popup = gtk_item_factory_get_widget(factory, "<popup>");
         if (index == 0)
             gtk_widget_set_sensitive(
-              gtk_item_factory_get_item(item_factory, "/Move Back..."), FALSE);
+                   gtk_item_factory_get_item(factory, "/Move Back..."), FALSE);
         if (index == g_list_length(image->bbbm->images) - 1)
             gtk_widget_set_sensitive(
-           gtk_item_factory_get_item(item_factory, "/Move Forward..."), FALSE);
+                gtk_item_factory_get_item(factory, "/Move Forward..."), FALSE);
         gtk_menu_popup(GTK_MENU(popup), NULL, NULL, NULL, NULL,
                        event->button, event->time);
     }
     return FALSE;
 }
 
+static gboolean bbbm_set_status(GtkWidget *widget, GdkEventCrossing *event,
+                                BBBMImage *image)
+{
+    gtk_statusbar_push(GTK_STATUSBAR(image->bbbm->image_bar),
+                       image->bbbm->image_cid,
+                       bbbm_image_get_description(image));
+    return FALSE;
+}
+
+static gboolean bbbm_clear_status(GtkWidget *widget, GdkEventCrossing *event,
+                                  BBBMImage *image)
+{
+    gtk_statusbar_pop(GTK_STATUSBAR(image->bbbm->image_bar),
+                      image->bbbm->image_cid);
+    gtk_statusbar_pop(GTK_STATUSBAR(image->bbbm->image_bar),
+                      image->bbbm->image_cid);
+    return FALSE;
+}
+
 static void bbbm_set(BBBMImage *image)
 {
-    bbbm_execute(image->bbbm->opts->set_command, image->filename);
+    bbbm_util_execute(image->bbbm->opts->set_cmd,
+                      bbbm_image_get_filename(image));
 }
 
 static void bbbm_view(BBBMImage *image)
 {
-    bbbm_execute(image->bbbm->opts->view_command, image->filename);
+    bbbm_util_execute(image->bbbm->opts->view_cmd,
+                      bbbm_image_get_filename(image));
 }
 
-static void bbbm_move_back(BBBMImage *image, gint index)
+static void bbbm_move_back(BBBMImage *image, guint index)
 {
-    bbbm_move_dialog(image, index, FALSE);
+    guint new_pos;
+    gint move = bbbm_dialogs_move(GTK_WINDOW(image->bbbm->window), "Move back",
+                                  index);
+    if (move == -1)
+        return;
+    new_pos = index - move;
+    image->bbbm->images = g_list_remove(image->bbbm->images, image);
+    image->bbbm->images = g_list_insert(image->bbbm->images, image, new_pos);
+    bbbm_reset_images(image->bbbm, new_pos);
     bbbm_set_modified(image->bbbm, TRUE);
 }
 
-static void bbbm_move_forward(BBBMImage *image, gint index)
+static void bbbm_move_forward(BBBMImage *image, guint index)
 {
-    bbbm_move_dialog(image, index, TRUE);
+    guint new_pos;
+    guint limit = g_list_length(image->bbbm->images) - index - 1;
+    gint move = bbbm_dialogs_move(GTK_WINDOW(image->bbbm->window),
+                                  "Move forward", limit);
+    if (move == -1)
+        return;
+    new_pos = index + move;
+    image->bbbm->images = g_list_remove(image->bbbm->images, image);
+    image->bbbm->images = g_list_insert(image->bbbm->images, image, new_pos);
+    bbbm_reset_images(image->bbbm, index);
     bbbm_set_modified(image->bbbm, TRUE);
 }
 
-static void bbbm_insert(BBBMImage *image)
+static void bbbm_edit(BBBMImage *image)
 {
-    GtkWidget *chooser = create_chooser(image->bbbm, "Insert images",
-                                        TRUE, TRUE);
-    while (gtk_dialog_run(GTK_DIALOG(chooser)) == GTK_RESPONSE_OK)
+    const gchar *old_desc = bbbm_image_get_description(image);
+    gchar *new_desc = bbbm_dialogs_edit(GTK_WINDOW(image->bbbm->window),
+                                        old_desc);
+    if (new_desc && strcmp(new_desc, old_desc))
     {
-        guint i;
-        gint index;
-        gchar **files = gtk_file_selection_get_selections(
-                                                  GTK_FILE_SELECTION(chooser));
-        if (!files || !files[0] ||
-            !g_file_test(files[0], G_FILE_TEST_IS_REGULAR))
-            // either no files, or a directory, or non-existing
-        {
-            if (files && files[0])
-            {
-                gchar *dir = NULL;
-                if (g_file_test(files[0], G_FILE_TEST_IS_DIR))
-                    dir = g_strconcat(files[0], "/", NULL);
-                else if (!g_file_test(files[0], G_FILE_TEST_EXISTS))
-                    dir = bbbm_util_dirname(files[0]);
-                gtk_file_selection_set_filename(GTK_FILE_SELECTION(chooser),
-                                                dir);
-                g_free(dir);
-            }
-            g_strfreev(files);
-            continue;
-        }
-        index = g_list_index(image->bbbm->images, image);
-        for (i = 0; files[i]; i++)
-        {
-            if (g_file_test(files[i], G_FILE_TEST_IS_REGULAR) &&
-                bbbm_is_image(files[i]))
-            {
-                gchar *absfile = bbbm_util_absolute_path(files[i]);
-                bbbm_add_image0(image->bbbm, absfile, NULL, index++);
-                g_free(absfile);
-            }
-        }
-        g_strfreev(files);
-        break;
+        /* normally we would call bbbm_image_set_description.
+           However, why do duplicate new_desc only to free it? */
+        g_free(image->description);
+        image->description = new_desc;
+        bbbm_set_modified(image->bbbm, TRUE);
     }
-    gtk_widget_destroy(chooser);
+    else if (new_desc)
+        g_free(new_desc);
 }
 
-static void bbbm_delete(BBBMImage *image)
+static void bbbm_insert(BBBMImage *image, guint index)
 {
-    gint index = g_list_index(image->bbbm->images, image);
-    // we're going to destroy image, so keep a copy of its BBBM
+    GList *files = bbbm_dialogs_get_files(GTK_WINDOW(image->bbbm->window),
+                                          "Insert images");
+    while (files)
+    {
+        gchar *file = (gchar *)files->data;
+        files = g_list_remove(files, file);
+        if (bbbm_util_is_image(file))
+            if (!bbbm_add_image0(image->bbbm, file, NULL, index++))
+            {
+                gchar *message = g_strconcat("Could not add image '", file,
+                                             "'", NULL);
+                bbbm_dialogs_error(GTK_WINDOW(image->bbbm->window), message);
+                g_free(message);
+                /* index got increased, decrease again */
+                --index;
+            }
+        g_free(file);
+    }
+}
+
+static void bbbm_delete(BBBMImage *image, guint index)
+{
     BBBM *bbbm = image->bbbm;
     bbbm->images = g_list_remove(bbbm->images, image);
     bbbm_image_destroy(image);
     if (index != g_list_length(bbbm->images))
-        // dit not remove the last one
-        bbbm_reorder(bbbm, index);
+        bbbm_reset_images(bbbm, index);
     bbbm_set_modified(bbbm, TRUE);
 }

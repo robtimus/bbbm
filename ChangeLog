@@ -1,6 +1,20 @@
 bbbm ChangeLog
 ----------------------------------------
 
+0.5
+---
+ - Rewrote great parts for greater readability
+ - Thumbnail size format is checked when reading the config file
+ - Added limits to the thumbnail size (screen size)
+ - Thumbnail size is split in width and height entries in the Options dialog
+ - Slightly changed some menu item labels
+ - Set filename status of unnamed collections to "Untitled"
+ - Added boolean options "Include filename as label" (filename_label) and
+   "Include filename as title" (filename_title), which set the menu label /
+   title of created Blackbox menus to the basename of the currently opened
+   collection.
+   The configuration file is updated automatically for these options
+
 0.4.2
 -----
  - Added support for long filenames in the created Blackbox menu (i.e. with

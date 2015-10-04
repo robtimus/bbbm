@@ -23,25 +23,18 @@
 
 #include <glib.h>
 
-/* Returns a pointer to the extension of the given filename, or NULL if there
-   is no extension. */
-const gchar *bbbm_util_extension(const gchar *file);
+gboolean bbbm_util_is_image(const gchar *filename);
 
-/* Returns the dirname of the given file, with a trailing /.
-   The dirname must be freed when it is no longer needed. */
-gchar *bbbm_util_dirname(const gchar *file);
+void bbbm_util_execute(const gchar *command, const gchar *filename);
 
-/* Creates dir, and if necessary any parent directory.
-   Returns 0 if successful, or non-0 upon error. */
 gint bbbm_util_makedirs(const gchar *dir);
 
-/* Returns the absolute, normalized path pointed to by path.
-   It must be freed when it is no longer needed. */
+gchar *bbbm_util_dirname(const gchar *filename);
+
 gchar *bbbm_util_absolute_path(const gchar *path);
 
-/* Returns a list with the names of all files (not dirs) inside the given dir.
-   The names must be freed with g_free when they are no longer needed,
-   the list must be freed with g_slist_free when it is no longer needed. */
 GList *bbbm_util_listdir(const gchar *dir);
+
+gchar *bbbm_util_get_size_str(gint width, gint height);
 
 #endif /* __BBBM_UTIL_H_ */

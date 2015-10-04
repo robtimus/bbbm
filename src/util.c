@@ -20,27 +20,52 @@
 
 #include <stdio.h>
 #include <string.h>
-#include <glib.h>
+#include <stdlib.h>
+#include <errno.h>
+#include <sys/wait.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <glib.h>
 #include "util.h"
 
-const gchar *bbbm_util_extension(const gchar *file)
+static gboolean bbbm_util_has_ext(const gchar *file, const gchar *ext);
+
+gboolean bbbm_util_is_image(const gchar *filename)
 {
-    guint len = strlen(file);
-    while (--len > 0 && file[len] != '.' && file[len] != '/')
-        ;
-    // len is now either 0, or files[len] is . or /
-    // only if files[len] is . it is an extension
-    return (file[len] == '.' ? file + len : NULL);
+    static const gchar *extensions[] =
+                               {".jpg", ".jpeg", ".gif", ".ppm", ".pgm", NULL};
+    guint i;
+    if (!g_file_test(filename, G_FILE_TEST_IS_REGULAR))
+        return FALSE;
+    for (i = 0; extensions[i]; ++i)
+        if (bbbm_util_has_ext(filename, extensions[i]))
+            return TRUE;
+    return FALSE;
 }
 
-gchar *bbbm_util_dirname(const gchar *file)
+void bbbm_util_execute(const gchar *command, const gchar *filename)
 {
-    gchar *dir = g_path_get_dirname(file);
-    gchar *dirname = g_strconcat(dir, "/", NULL);
-    g_free(dir);
-    return dirname;
+    pid_t pid;
+    if (!command || !filename || !strcmp(command, ""))
+        return;
+    if (!(pid = fork()))
+    {
+        gchar *cmd = g_strconcat(command, " \"", filename, "\"", NULL);
+        gint ret;
+        /* use system instead of exec* for less strict commands */
+        if ((ret = system(cmd)) == -1)
+            fprintf(stderr, "bbbm: could not execute '%s': %s\n",
+                    cmd, g_strerror(errno));
+        /* cmd prints its own error */
+        g_free(cmd);
+        /* the child process will try to get back to the window */
+        exit(WEXITSTATUS(ret));
+    }
+    else if (pid == -1)
+    {
+        fprintf(stderr, "bbbm: could not execute '%s \"%s\"': %s\n",
+                command, filename, g_strerror(errno));
+    }
 }
 
 gint bbbm_util_makedirs(const gchar *dir)
@@ -50,7 +75,7 @@ gint bbbm_util_makedirs(const gchar *dir)
         gchar *parent = g_path_get_dirname(dir);
         if (strcmp(parent, "/"))
         {
-            // there is a parent; create it if necessary
+            /* there is a parent other than / */
             gint rc;
             if ((rc = bbbm_util_makedirs(parent)))
             {
@@ -59,18 +84,27 @@ gint bbbm_util_makedirs(const gchar *dir)
             }
         }
         g_free(parent);
-        // return the result of mkdir, which is 0 upon success
         return mkdir(dir, 0755);
     }
+    else if (!g_file_test(dir, G_FILE_TEST_IS_DIR))
+        return 1;
     return 0;
+}
+
+gchar *bbbm_util_dirname(const gchar *filename)
+{
+    gchar *dir = g_path_get_dirname(filename);
+    gchar *dirname = g_strconcat(dir, "/", NULL);
+    g_free(dir);
+    return dirname;
 }
 
 gchar *bbbm_util_absolute_path(const gchar *path)
 {
-    gchar *dir, *file, *abs, *current;
     if (g_file_test(path, G_FILE_TEST_IS_DIR))
     {
-        current = g_get_current_dir();
+        gchar *current = g_get_current_dir();
+        gchar *dir;
         if (chdir(path) == -1)
         {
             g_free(current);
@@ -83,18 +117,18 @@ gchar *bbbm_util_absolute_path(const gchar *path)
     }
     else
     {
-        dir = g_path_get_dirname(path);
-        file = g_path_get_basename(path);
-        current = g_get_current_dir();
+        gchar *current = g_get_current_dir();
+        gchar *dir = g_path_get_dirname(path);
+        gchar *file, *abs;
         if (chdir(dir) == -1)
         {
-            g_free(dir);
-            g_free(file);
             g_free(current);
+            g_free(dir);
             return g_strdup(path);
         }
         g_free(dir);
         dir = g_get_current_dir();
+        file = g_path_get_basename(path);
         abs = g_strjoin("/", dir, file, NULL);
         chdir(current);
         g_free(current);
@@ -106,34 +140,49 @@ gchar *bbbm_util_absolute_path(const gchar *path)
 
 GList *bbbm_util_listdir(const gchar *dir)
 {
-    GDir *d;
-    const gchar *entry;
     GList *files = NULL;
     GError *error = NULL;
-
-    if (!(d = g_dir_open(dir, 0, &error)))
+    const gchar *entry;
+    GDir *d = g_dir_open(dir, 0, &error);
+    if (!d)
     {
         fprintf(stderr, "bbbm: could not open dir '%s' for reading: %s\n",
                 dir, error->message);
         g_error_free(error);
-        // files is still NULL
-        return files;
+        return NULL;
     }
     while ((entry = g_dir_read_name(d)))
     {
         gchar *file = g_strconcat(dir, "/", entry, NULL);
         if (g_file_test(file, G_FILE_TEST_IS_REGULAR))
-        {
-            gchar *file2 = bbbm_util_absolute_path(file);
-            g_free(file);
-            files = g_list_append(files, file2);
-        }
-        else
-        {
-            // not a file, so free it now
-            g_free(file);
-        }
+            files = g_list_append(files, bbbm_util_absolute_path(file));
+        g_free(file);
     }
     g_dir_close(d);
     return files;
 }
+
+gchar *bbbm_util_get_size_str(gint width, gint height)
+{
+    /* with size 16, both sizes can take 7 digits, should be enough */
+    gchar text[16];
+    sprintf(text, "%dx%d", width, height);
+    return g_strdup(text);
+}
+
+static gboolean bbbm_util_has_ext(const gchar *file, const gchar *ext)
+{
+    /* code inspired by GLib's g_str_has_suffix */
+    gint file_len, ext_len;
+
+    if (!file)
+        return FALSE;
+    if (!ext)
+        return TRUE;
+    file_len = strlen(file);
+    ext_len = strlen(ext);
+    if (file_len < ext_len)
+        return FALSE;
+    return strcmp(file + file_len - ext_len, ext) == 0;
+}
+
