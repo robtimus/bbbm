@@ -23,36 +23,63 @@
 
 #include <glib.h>
 
-#define SET_COMMAND     "bsetbg"
-#define VIEW_COMMAND    "gqview"
-#define THUMB_WIDTH     128
-#define THUMB_HEIGHT    96
-#define THUMB_COLS      4
+#define BBBM_OPTIONS_MAX_THUMB_WIDTH         (gdk_screen_width())
+#define BBBM_OPTIONS_MAX_THUMB_HEIGHT        (gdk_screen_height())
+#define BBBM_OPTIONS_MAX_THUMB_COLUMN_COUNT  100
 
-#define MAX_WIDTH       (gdk_screen_width())
-#define MAX_HEIGHT      (gdk_screen_height())
-#define MAX_COLS        10
-#define MAX_COMMANDS    10
+typedef struct _BBBMOptions BBBMOptions;
 
-struct options
-{
-    gchar *set_cmd;
-    gchar *view_cmd;
-    gint thumb_width;
-    gint thumb_height;
-    gint thumb_cols;
-    gboolean filename_label;
-    gboolean filename_title;
-    gchar *commands[MAX_COMMANDS];
-    gchar *cmd_labels[MAX_COMMANDS];
+struct _BBBMOptions {
+    gchar *set_command;
+    guint thumb_width;
+    guint thumb_height;
+    guint thumb_column_count;
+    gboolean filename_as_label;
+    gboolean filename_as_title;
+    guint current_command_count;
+    guint new_command_count;
+    gchar **commands;
+    gchar **command_labels;
 };
 
-struct options *bbbm_options_new();
+/* Creates a new BBBMOptions object with default settings.
+   The returned object must be freed with bbbm_options_destroy when no longer needed */
+BBBMOptions *bbbm_options_new();
 
-void bbbm_options_destroy(struct options *opts);
+/* Creates a new BBBMOptions object with the settings read from the given file.
+   If an error occurs reading the file NULL is returned instead.
+   The returned object (if not NULL) must be freed with bbbm_options_destroy when no longer needed */
+BBBMOptions *bbbm_options_read_from_file(const gchar *filename);
 
-gint bbbm_options_write(struct options *opts, const gchar *filename);
+/* Writes the settings in the given BBBMOptions object to the given file */
+void bbbm_options_write_to_file(BBBMOptions *options, const gchar *filename);
 
-struct options *bbbm_options_read(const gchar *filename);
+const gchar *bbbm_options_get_set_command(BBBMOptions *options);
+gboolean bbbm_options_set_set_command(BBBMOptions *options, const gchar *set_command);
+
+const guint bbbm_options_get_thumb_width(BBBMOptions *options);
+const guint bbbm_options_get_thumb_height(BBBMOptions *options);
+gboolean bbbm_options_set_thumb_size(BBBMOptions *options, const guint width, const guint height);
+
+const guint bbbm_options_get_thumb_column_count(BBBMOptions *options);
+gboolean bbbm_options_set_thumb_column_count(BBBMOptions *options, const guint column_count);
+
+const gboolean bbbm_options_get_filename_as_label(BBBMOptions *options);
+gboolean bbbm_options_set_filename_as_label(BBBMOptions *options, const gboolean filename_as_label);
+
+const gboolean bbbm_options_get_filename_as_title(BBBMOptions *options);
+gboolean bbbm_options_set_filename_as_title(BBBMOptions *options, const gboolean filename_as_title);
+
+const guint bbbm_options_get_current_command_count(BBBMOptions *options);
+const guint bbbm_options_get_new_command_count(BBBMOptions *options);
+gboolean bbbm_options_set_command_count(BBBMOptions *options, const guint command_count);
+
+const gchar *bbbm_options_get_command(BBBMOptions *options, guint index);
+gboolean bbbm_options_set_command(BBBMOptions *options, guint index, const gchar *command);
+
+const gchar *bbbm_options_get_command_label(BBBMOptions *options, guint index);
+gboolean bbbm_options_set_command_label(BBBMOptions *options, guint index, const gchar *label);
+
+void bbbm_options_destroy(BBBMOptions *options);
 
 #endif /* __BBBM_OPTIONS_H_ */

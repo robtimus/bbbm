@@ -21,20 +21,38 @@
 #ifndef __BBBM_UTIL_H_
 #define __BBBM_UTIL_H_
 
+#include <stdarg.h>
 #include <glib.h>
 
+/* Returns whether or not the given string is NULL or empty */
+gboolean bbbm_str_empty(const gchar *str);
+
+/* Returns whether or not the given strings are equal (NULL safe) */
+gboolean bbbm_str_equals(const gchar *str1, const gchar *str2);
+
+/* Returns whether or not the given string is a valid image filename */
 gboolean bbbm_util_is_image(const gchar *filename);
 
+/* Returns a fully expanded command based on the given command and filename
+   The returned string must be freed when no longer needed */
 gchar *bbbm_util_get_command(const gchar *command, const gchar *filename);
 
+/* Executes the given command for the given filename */
 void bbbm_util_execute(const gchar *command, const gchar *filename);
 
+/* Executes the given command */
 void bbbm_util_execute_cmd(const gchar *command);
 
+/* Returns the dirname for the given filename.
+   The returned string must be freed when no longer needed */
 gchar *bbbm_util_dirname(const gchar *filename);
 
+/* Returns an absolute path based on the given path.
+   The returned string must be freed when no longer needed */
 gchar *bbbm_util_absolute_path(const gchar *path);
 
+/* Lists all regular files in the given directory.
+   The returned list and all of its elements (strings) must be freed when no longer needed */
 GList *bbbm_util_listdir(const gchar *dir);
 
 #endif /* __BBBM_UTIL_H_ */

@@ -1,8 +1,8 @@
-bbbm known bug list:
-----------------------------------------
+Known issues
+------------
 
-- Image description status bar is not cleared sometimes
+- The image description status bar is not cleared sometimes
+  * Has this been solved in version 0.8?
 
-If you happen to find a bug, please mail me.
-
-Rob Spoor <bbbm@icemanx.nl>
+If you happen to find a bug, please mail me at <bbbm@icemanx.nl>.
+Don't forget to mention the bbbm version.

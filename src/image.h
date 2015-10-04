@@ -25,22 +25,16 @@
 #include "bbbm.h"
 
 #define BBBM_TYPE_IMAGE             (bbbm_image_get_type())
-#define BBBM_IMAGE(obj)             (G_TYPE_CHECK_INSTANCE_CAST((obj),\
-                                     BBBM_TYPE_IMAGE, BBBMImage))
-#define BBBM_IMAGE_CLASS(klass)     (G_TYPE_CHECK_CLASS_CAST((klass),\
-                                     BBBM_TYPE_IMAGE, BBBMImageClass))
-#define BBBM_IS_IMAGE(obj)          (G_TYPE_CHECK_INSTANCE_TYPE((obj),\
-                                     BBBM_TYPE_IMAGE))
-#define BBBM_IS_IMAGE_CLASS(klass)  (G_TYPE_CHECK_CLASS_TYPE((klass),\
-                                     BBBM_TYPE_IMAGE))
-#define BBBM_IMAGE_GET_CLASS(obj)   (G_TYPE_INSTANCE_GET_CLASS((obj),\
-                                     BBBM_TYPE_IMAGE, BBBMImageClass))
+#define BBBM_IMAGE(obj)             (G_TYPE_CHECK_INSTANCE_CAST((obj), BBBM_TYPE_IMAGE, BBBMImage))
+#define BBBM_IMAGE_CLASS(klass)     (G_TYPE_CHECK_CLASS_CAST((klass), BBBM_TYPE_IMAGE, BBBMImageClass))
+#define BBBM_IS_IMAGE(obj)          (G_TYPE_CHECK_INSTANCE_TYPE((obj), BBBM_TYPE_IMAGE))
+#define BBBM_IS_IMAGE_CLASS(klass)  (G_TYPE_CHECK_CLASS_TYPE((klass), BBBM_TYPE_IMAGE))
+#define BBBM_IMAGE_GET_CLASS(obj)   (G_TYPE_INSTANCE_GET_CLASS((obj), BBBM_TYPE_IMAGE, BBBMImageClass))
 
 typedef struct _BBBMImage      BBBMImage;
 typedef struct _BBBMImageClass BBBMImageClass;
 
-struct _BBBMImage
-{
+struct _BBBMImage {
     GtkEventBox parent;
     BBBM *bbbm;
     GtkWidget *image;
@@ -48,22 +42,21 @@ struct _BBBMImage
     gchar *description;
 };
 
-struct _BBBMImageClass
-{
+struct _BBBMImageClass {
     GtkEventBoxClass parent_class;
 };
 
 GType bbbm_image_get_type();
 
-GtkWidget *bbbm_image_new(BBBM *bbbm, const gchar *filename,
-                          const gchar *description, guint width, guint height);
+/* Creates a new image with the given filename, description and size.
+   The returned widget must be destroyed with gtk_widget_destroy when no longer needed */
+GtkWidget *bbbm_image_new(BBBM *bbbm, const gchar *filename, const gchar *description, guint width, guint height);
 
-G_CONST_RETURN gchar *bbbm_image_get_filename(BBBMImage *image);
+const gchar *bbbm_image_get_filename(BBBMImage *image);
 
-G_CONST_RETURN gchar *bbbm_image_get_description(BBBMImage *image);
-
+const gchar *bbbm_image_get_description(BBBMImage *image);
 void bbbm_image_set_description(BBBMImage *image, const gchar *description);
-
+/* Like bbbm_image_set_description but instead of duplicating the description, a direct reference is used */
 void bbbm_image_set_description_ref(BBBMImage *image, gchar *description);
 
 void bbbm_image_resize(BBBMImage *image, guint width, guint height);

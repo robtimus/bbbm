@@ -21,18 +21,12 @@
 #ifndef __BBBM_H_
 #define __BBBM_H_
 
-#define VERSION         "0.7.3"
-#define BBBM_DIR        "/.bbbm"
-#define BBBM_CONFIG     "/bbbm.cfg"
-#define BBBM_THUMBS     "/thumbs/"
-
 #include <gtk/gtk.h>
 #include "options.h"
 
-typedef struct
-{
-    struct options *opts;
-    const gchar *config;
+typedef struct {
+    BBBMOptions *options;
+    const gchar *config_file;
     gchar *filename;
     gboolean modified;
     GList *images;
@@ -46,7 +40,9 @@ typedef struct
     GtkItemFactory *factory;
 } BBBM;
 
-BBBM *bbbm_new(struct options *opts, const gchar *config, const gchar *file);
+/* Creates a new BBBM object with the given options, configuration file and optional initial collection file.
+   The returned object must be destroyed with bbbm_destroy when no longer needed */
+BBBM *bbbm_new(BBBMOptions *options, const gchar *config_file, const gchar *collection_file);
 
 void bbbm_destroy(BBBM *bbbm);
 

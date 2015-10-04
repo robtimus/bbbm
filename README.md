@@ -1,29 +1,14 @@
-bbbm README file:
------------------
-
 What is bbbm ?
---------------
+==============
 bbbm stands for Blackbox background manager. It shows a collection of
-thumbnails, which can be set as the background, or viewed first.
+thumbnails, which can be set as the background.
 bbbm also allows for setting a random background and creating both a list of
 backgrounds, or a Blackbox background submenu.
 
 What are the sytem requirements ?
----------------------------------
-* GTK2 (plus development package).
-* GCC and pkgconfig for compiling.
+=================================
+* gtk+-2.0 or up.
+* gcc, pkg-config and gtk+ development package for compiling.
 
 Although the name would suggest that Blackbox is needed, any command to set the
-background can be used. GQView is the default image viewer, but this can be
-changed as well.
-
-How to compile/install ?
-------------------------
-Go to the src directory and type 'make'.
-Next, as root, type 'make install' to copy the bbbm executable to
-/usr/local/bin, or copy it to a directory of choice manually.
-
-How to contact the author (me):
--------------------------------
-Just E-mail all bugreports (and fixes), suggestions or comments to
- bbbm@icemanx.nl
+background can be used.

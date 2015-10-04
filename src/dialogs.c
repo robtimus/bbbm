@@ -19,461 +19,452 @@
  */
 
 #include <string.h>
+#include <stdarg.h>
 #include <gtk/gtk.h>
+#include "config.h"
 #include "dialogs.h"
 #include "options.h"
 #include "bbbm.h"
 #include "util.h"
 
-#define PADDING                 5
-#define OPTION_LABEL_ALIGN_X    1
-#define OPTION_LABEL_ALIGN_Y    0.5
+#define PADDING                5
+#define OPTION_LABEL_ALIGN_X   1
+#define OPTION_LABEL_ALIGN_Y   0.5
 
-gboolean bbbm_dialogs_question(GtkWindow *parent, const gchar *title,
-                               const gchar *message)
-{
+static gboolean bbbm_dialogs_confirm_overwrite(GtkWindow *parent, const gchar *file);
+
+gboolean bbbm_dialogs_question(GtkWindow *parent, const gchar *title, const gchar *format, ...) {
     gboolean result;
-    GtkWidget *dialog = gtk_message_dialog_new(parent, 0, GTK_MESSAGE_QUESTION,
-                                               GTK_BUTTONS_YES_NO, "%s", message);
+    va_list args;
+    gchar *message;
+    GtkWidget *dialog;
+
+    va_start(args, format);
+    message = g_strdup_vprintf(format, args);
+    va_end(args);
+
+    dialog = gtk_message_dialog_new(parent,
+                                    GTK_DIALOG_MODAL | GTK_DIALOG_DESTROY_WITH_PARENT,
+                                    GTK_MESSAGE_QUESTION,
+                                    GTK_BUTTONS_YES_NO,
+                                    "%s", message);
     gtk_window_set_title(GTK_WINDOW(dialog), title);
     gtk_window_set_resizable(GTK_WINDOW(dialog), FALSE);
     result = gtk_dialog_run(GTK_DIALOG(dialog)) == GTK_RESPONSE_YES;
     gtk_widget_destroy(dialog);
+    g_free(message);
     return result;
 }
 
-void bbbm_dialogs_error(GtkWindow *parent, const gchar *message)
-{
-    GtkWidget *dialog = gtk_message_dialog_new(parent, 0, GTK_MESSAGE_ERROR,
-                                               GTK_BUTTONS_OK, "%s", message);
+void bbbm_dialogs_error(GtkWindow *parent, const gchar *format, ...) {
+    va_list args;
+    gchar *message;
+    GtkWidget *dialog;
+
+    va_start(args, format);
+    message = g_strdup_vprintf(format, args);
+    va_end(args);
+
+    dialog = gtk_message_dialog_new(parent,
+                                    GTK_DIALOG_MODAL | GTK_DIALOG_DESTROY_WITH_PARENT,
+                                    GTK_MESSAGE_ERROR,
+                                    GTK_BUTTONS_OK,
+                                    "%s", message);
     gtk_window_set_title(GTK_WINDOW(dialog), "Error");
     gtk_dialog_run(GTK_DIALOG(dialog));
     gtk_widget_destroy(dialog);
+    g_free(message);
 }
 
-GList *bbbm_dialogs_get_files(GtkWindow *parent, const gchar *title)
-{
+GList *bbbm_dialogs_get_files(GtkWindow *parent, const gchar *title) {
     GList *result = NULL;
-    GtkWidget *chooser = gtk_file_selection_new(title);
-    gtk_window_set_transient_for(GTK_WINDOW(chooser), parent);
-    gtk_file_selection_set_select_multiple(GTK_FILE_SELECTION(chooser), TRUE);
-    gtk_file_selection_hide_fileop_buttons(GTK_FILE_SELECTION(chooser));
-    while (gtk_dialog_run(GTK_DIALOG(chooser)) == GTK_RESPONSE_OK)
-    {
+    GtkWidget *file_selection;
+
+    file_selection = gtk_file_selection_new(title);
+    gtk_window_set_transient_for(GTK_WINDOW(file_selection), parent);
+    gtk_file_selection_set_select_multiple(GTK_FILE_SELECTION(file_selection), TRUE);
+    gtk_file_selection_hide_fileop_buttons(GTK_FILE_SELECTION(file_selection));
+
+    while (gtk_dialog_run(GTK_DIALOG(file_selection)) == GTK_RESPONSE_OK) {
         gchar *dir;
-        gchar **files =
-                gtk_file_selection_get_selections(GTK_FILE_SELECTION(chooser));
-        if (files && files[0] && g_file_test(files[0], G_FILE_TEST_IS_REGULAR))
-        {
-            guint i;
-            for (i = 0; files[i]; ++i)
-                if (g_file_test(files[i], G_FILE_TEST_IS_REGULAR))
-                    result = g_list_append(result,
-                                           bbbm_util_absolute_path(files[i]));
+        gchar **files;
+
+        files = gtk_file_selection_get_selections(GTK_FILE_SELECTION(file_selection));
+        if (files != NULL && files[0] != NULL && g_file_test(files[0], G_FILE_TEST_IS_REGULAR)) {
+            int i;
+            for (i = 0; files[i] != NULL; ++i) {
+                if (g_file_test(files[i], G_FILE_TEST_IS_REGULAR)) {
+                    result = g_list_append(result, bbbm_util_absolute_path(files[i]));
+                }
+            }
             g_strfreev(files);
             break;
         }
-        dir = (g_file_test(files[0], G_FILE_TEST_IS_DIR) ?
-               g_strconcat(files[0], "/", NULL) :
-               bbbm_util_dirname(files[0]));
-        gtk_file_selection_set_filename(GTK_FILE_SELECTION(chooser), dir);
+        dir = g_file_test(files[0], G_FILE_TEST_IS_DIR)
+                ? g_strconcat(files[0], "/", NULL)
+                : bbbm_util_dirname(files[0]);
+        gtk_file_selection_set_filename(GTK_FILE_SELECTION(file_selection), dir);
         g_free(dir);
         g_strfreev(files);
     }
-    gtk_widget_destroy(chooser);
+    gtk_widget_destroy(file_selection);
     return result;
 }
 
-GList *bbbm_dialogs_get_files_dir(GtkWindow *parent, const gchar *title)
-{
+GList *bbbm_dialogs_get_files_dir(GtkWindow *parent, const gchar *title) {
     GList *result = NULL;
-    GtkWidget *chooser = gtk_file_selection_new(title);
-    gtk_window_set_transient_for(GTK_WINDOW(chooser), parent);
-    gtk_file_selection_set_select_multiple(GTK_FILE_SELECTION(chooser), FALSE);
-    gtk_file_selection_hide_fileop_buttons(GTK_FILE_SELECTION(chooser));
-    while (gtk_dialog_run(GTK_DIALOG(chooser)) == GTK_RESPONSE_OK)
-    {
+    GtkWidget *file_selection;
+
+    file_selection = gtk_file_selection_new(title);
+    gtk_window_set_transient_for(GTK_WINDOW(file_selection), parent);
+    gtk_file_selection_set_select_multiple(GTK_FILE_SELECTION(file_selection), FALSE);
+    gtk_file_selection_hide_fileop_buttons(GTK_FILE_SELECTION(file_selection));
+
+    while (gtk_dialog_run(GTK_DIALOG(file_selection)) == GTK_RESPONSE_OK) {
         gchar *dir;
-        gchar *file = bbbm_util_absolute_path(
-                 gtk_file_selection_get_filename(GTK_FILE_SELECTION(chooser)));
-        if (g_file_test(file, G_FILE_TEST_IS_DIR))
-        {
+        gchar *file;
+
+        file = bbbm_util_absolute_path(gtk_file_selection_get_filename(GTK_FILE_SELECTION(file_selection)));
+        if (g_file_test(file, G_FILE_TEST_IS_DIR)) {
             result = bbbm_util_listdir(file);
             g_free(file);
             break;
         }
         dir = bbbm_util_dirname(file);
-        gtk_file_selection_set_filename(GTK_FILE_SELECTION(chooser), dir);
+        gtk_file_selection_set_filename(GTK_FILE_SELECTION(file_selection), dir);
         g_free(dir);
         g_free(file);
     }
-    gtk_widget_destroy(chooser);
+    gtk_widget_destroy(file_selection);
     return result;
 }
 
-gchar *bbbm_dialogs_get_file(GtkWindow *parent, const gchar *title)
-{
+gchar *bbbm_dialogs_get_file(GtkWindow *parent, const gchar *title) {
     gchar *result = NULL;
-    GtkWidget *chooser = gtk_file_selection_new(title);
-    gtk_window_set_transient_for(GTK_WINDOW(chooser), parent);
-    gtk_file_selection_set_select_multiple(GTK_FILE_SELECTION(chooser), FALSE);
-    gtk_file_selection_hide_fileop_buttons(GTK_FILE_SELECTION(chooser));
-    while (gtk_dialog_run(GTK_DIALOG(chooser)) == GTK_RESPONSE_OK)
-    {
+    GtkWidget *file_selection;
+
+    file_selection = gtk_file_selection_new(title);
+    gtk_window_set_transient_for(GTK_WINDOW(file_selection), parent);
+    gtk_file_selection_set_select_multiple(GTK_FILE_SELECTION(file_selection), FALSE);
+    gtk_file_selection_hide_fileop_buttons(GTK_FILE_SELECTION(file_selection));
+
+    while (gtk_dialog_run(GTK_DIALOG(file_selection)) == GTK_RESPONSE_OK) {
         gchar *dir;
-        gchar *file = bbbm_util_absolute_path(
-                 gtk_file_selection_get_filename(GTK_FILE_SELECTION(chooser)));
-        if (g_file_test(file, G_FILE_TEST_IS_REGULAR))
-        {
+        gchar *file;
+
+        file = bbbm_util_absolute_path(gtk_file_selection_get_filename(GTK_FILE_SELECTION(file_selection)));
+        if (g_file_test(file, G_FILE_TEST_IS_REGULAR)) {
             result = file;
             break;
         }
-        dir = (g_file_test(file, G_FILE_TEST_IS_DIR) ?
-               g_strconcat(file, "/", NULL) :  bbbm_util_dirname(file));
-        gtk_file_selection_set_filename(GTK_FILE_SELECTION(chooser), dir);
+        dir = g_file_test(file, G_FILE_TEST_IS_DIR)
+                ? g_strconcat(file, "/", NULL)
+                : bbbm_util_dirname(file);
+        gtk_file_selection_set_filename(GTK_FILE_SELECTION(file_selection), dir);
         g_free(dir);
         g_free(file);
     }
-    gtk_widget_destroy(chooser);
+    gtk_widget_destroy(file_selection);
     return result;
 }
 
-void bbbm_dialogs_save(GtkWindow *parent, const gchar *title,
-                       save_function save, gpointer data)
-{
-    GtkWidget *chooser = gtk_file_selection_new(title);
-    gtk_window_set_transient_for(GTK_WINDOW(chooser), parent);
-    gtk_file_selection_set_select_multiple(GTK_FILE_SELECTION(chooser), FALSE);
-    while (gtk_dialog_run(GTK_DIALOG(chooser)) == GTK_RESPONSE_OK)
-    {
+void bbbm_dialogs_save(GtkWindow *parent, const gchar *title, bbbm_save_function save, gpointer data) {
+    GtkWidget *file_selection;
+
+    file_selection = gtk_file_selection_new(title);
+    gtk_window_set_transient_for(GTK_WINDOW(file_selection), parent);
+    gtk_file_selection_set_select_multiple(GTK_FILE_SELECTION(file_selection), FALSE);
+
+    while (gtk_dialog_run(GTK_DIALOG(file_selection)) == GTK_RESPONSE_OK) {
         gchar *dir;
-        gchar *file = bbbm_util_absolute_path(
-                 gtk_file_selection_get_filename(GTK_FILE_SELECTION(chooser)));
-        gchar *message = g_strconcat("File '", file, "' exists. Overwrite?",
-                                     NULL);
-        if (!g_file_test(file, G_FILE_TEST_EXISTS) ||
-            (g_file_test(file, G_FILE_TEST_IS_REGULAR) &&
-             bbbm_dialogs_question(parent, "Overwrite?", message)))
-        {
-            if (save(data, file))
-            {
+        gchar *file;
+
+        file = bbbm_util_absolute_path(gtk_file_selection_get_filename(GTK_FILE_SELECTION(file_selection)));
+        if (!g_file_test(file, G_FILE_TEST_EXISTS)
+                || (g_file_test(file, G_FILE_TEST_IS_REGULAR) && bbbm_dialogs_confirm_overwrite(parent, file))) {
+
+            if (save(data, file)) {
                 g_free(file);
-                g_free(message);
                 break;
             }
-            g_free(message);
-            message = g_strconcat("Could not save to '", file, "'", NULL);
-            bbbm_dialogs_error(parent, message);
+            bbbm_dialogs_error(parent, "Could not save to '%s'", file);
         }
-        g_free(message);
-        dir = (g_file_test(file, G_FILE_TEST_IS_DIR) ?
-               g_strconcat(file, "/", NULL) :  bbbm_util_dirname(file));
-        gtk_file_selection_set_filename(GTK_FILE_SELECTION(chooser), dir);
+        dir = g_file_test(file, G_FILE_TEST_IS_DIR)
+                ? g_strconcat(file, "/", NULL)
+                : bbbm_util_dirname(file);
+        gtk_file_selection_set_filename(GTK_FILE_SELECTION(file_selection), dir);
         g_free(dir);
         g_free(file);
     }
-    gtk_widget_destroy(chooser);
+    gtk_widget_destroy(file_selection);
 }
 
-guint bbbm_dialogs_options(GtkWindow *parent, struct options *opts)
-{
+guint bbbm_dialogs_options(GtkWindow *parent, BBBMOptions *options) {
     guint result = 0;
-    GtkWidget *dialog, *notebook, *vbox, *frame, *table, *label, *set_entry,
-              *view_entry, *hbox, *width_entry, *height_entry, *cols_entry,
-              *label_check, *title_check, *scroll;
+    GtkWidget *dialog, *notebook, *vbox, *hbox, *frame, *table, *label, *scrolled_window;
+    GtkWidget *set_command_entry,
+              *thumb_width_entry, *thumb_height_entry, *thumb_column_count_entry,
+              *filename_as_label_check_button, *filename_as_title_check_button;
     GtkSizeGroup *group;
-    GtkWidget *commands[MAX_COMMANDS], *cmd_labels[MAX_COMMANDS];
-    GtkObject *adj;
+    GtkWidget **commands, **command_labels;
+    guint command_count;
     guint i;
 
     dialog = gtk_dialog_new_with_buttons("Options", parent,
-                                         GTK_DIALOG_NO_SEPARATOR,
+                                         GTK_DIALOG_MODAL | GTK_DIALOG_DESTROY_WITH_PARENT | GTK_DIALOG_NO_SEPARATOR,
                                          GTK_STOCK_OK, GTK_RESPONSE_OK,
                                          GTK_STOCK_CANCEL, GTK_RESPONSE_CANCEL,
                                          NULL);
+
     group = gtk_size_group_new(GTK_SIZE_GROUP_HORIZONTAL);
+
     notebook = gtk_notebook_new();
-    vbox = gtk_vbox_new(FALSE, 0);
-   
-    frame = gtk_frame_new("Commands");
-    gtk_container_set_border_width(GTK_CONTAINER(frame), PADDING);
-    table = gtk_table_new(2, 2, FALSE);
-    label = gtk_label_new("Set command:");
-    gtk_misc_set_alignment(GTK_MISC(label), OPTION_LABEL_ALIGN_X,
-                           OPTION_LABEL_ALIGN_Y);
-    gtk_size_group_add_widget(group, label);
-    gtk_table_attach(GTK_TABLE(table), label, 0, 1, 0, 1, 0, 0, PADDING, 0);
-    set_entry = gtk_entry_new();
-    gtk_entry_set_text(GTK_ENTRY(set_entry), opts->set_cmd);
-    gtk_table_attach(GTK_TABLE(table), set_entry, 1, 2, 0, 1,
-                     GTK_EXPAND | GTK_FILL, 0, PADDING, 0);
-    label = gtk_label_new("View command:");
-    gtk_misc_set_alignment(GTK_MISC(label), OPTION_LABEL_ALIGN_X,
-                           OPTION_LABEL_ALIGN_Y);
-    gtk_size_group_add_widget(group, label);
-    gtk_table_attach(GTK_TABLE(table), label, 0, 1, 1, 2, 0, 0, PADDING, 0);
-    view_entry = gtk_entry_new();
-    gtk_entry_set_text(GTK_ENTRY(view_entry), opts->view_cmd);
-    gtk_table_attach(GTK_TABLE(table), view_entry, 1, 2, 1, 2,
-                     GTK_EXPAND | GTK_FILL, 0, PADDING, PADDING);
-    gtk_container_add(GTK_CONTAINER(frame), table);
-    gtk_box_pack_start(GTK_BOX(vbox), frame, FALSE, FALSE, 0);
 
-    frame = gtk_frame_new("Thumbnails");
-    gtk_container_set_border_width(GTK_CONTAINER(frame), PADDING);
-    table = gtk_table_new(2, 2, FALSE);
-    label = gtk_label_new("Thumbnail size:");
-    gtk_misc_set_alignment(GTK_MISC(label), OPTION_LABEL_ALIGN_X,
-                           OPTION_LABEL_ALIGN_Y);
-    gtk_size_group_add_widget(group, label);
-    gtk_table_attach(GTK_TABLE(table), label, 0, 1, 0, 1, 0, 0, PADDING, 0);
-    hbox = gtk_hbox_new(FALSE, PADDING);
-    gtk_table_attach(GTK_TABLE(table), hbox, 1, 2, 0, 1,
-                     GTK_EXPAND | GTK_FILL, 0, PADDING, 0);
-    adj = gtk_adjustment_new(opts->thumb_width, 1, MAX_WIDTH, 1, 1, 1);
-    width_entry = gtk_spin_button_new(GTK_ADJUSTMENT(adj), 1, 0);
-    gtk_box_pack_start(GTK_BOX(hbox), width_entry, TRUE, TRUE, 0);
-    label = gtk_label_new("x");
-    gtk_box_pack_start(GTK_BOX(hbox), label, FALSE, FALSE, 0);
-    adj = gtk_adjustment_new(opts->thumb_height, 1, MAX_HEIGHT, 1, 1, 1);
-    height_entry = gtk_spin_button_new(GTK_ADJUSTMENT(adj), 1, 0);
-    gtk_box_pack_start(GTK_BOX(hbox), height_entry, TRUE, TRUE, 0);
-    label = gtk_label_new("Thumbnail columns:");
-    gtk_misc_set_alignment(GTK_MISC(label), OPTION_LABEL_ALIGN_X,
-                           OPTION_LABEL_ALIGN_Y);
-    gtk_size_group_add_widget(group, label);
-    gtk_table_attach(GTK_TABLE(table), label, 0, 1, 1, 2, 0, 0, PADDING, 0);
-    adj = gtk_adjustment_new(opts->thumb_cols, 1, MAX_COLS, 1, 1, 1);
-    cols_entry = gtk_spin_button_new(GTK_ADJUSTMENT(adj), 1, 0);
-    gtk_table_attach(GTK_TABLE(table), cols_entry, 1, 2, 1, 2,
-                     GTK_EXPAND | GTK_FILL, 0, PADDING, PADDING);
-    gtk_container_add(GTK_CONTAINER(frame), table);
-    gtk_box_pack_start(GTK_BOX(vbox), frame, FALSE, FALSE, 0);
- 
-    frame = gtk_frame_new("Menu options");
-    gtk_container_set_border_width(GTK_CONTAINER(frame), PADDING);
-    table = gtk_table_new(2, 1, FALSE);
-    label_check = gtk_check_button_new_with_mnemonic("Use filename as _label");
-    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(label_check),
-                                 opts->filename_label);
-    gtk_table_attach(GTK_TABLE(table), label_check, 0, 1, 0, 1,
-                     GTK_EXPAND | GTK_FILL, 0, PADDING, 0);
-    title_check = gtk_check_button_new_with_mnemonic("Use filename as _title");
-    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(title_check),
-                                 opts->filename_title);
-    gtk_table_attach(GTK_TABLE(table), title_check, 0, 1, 1, 2,
-                     GTK_EXPAND | GTK_FILL, 0, PADDING, 0);
-    gtk_container_add(GTK_CONTAINER(frame), table);
-    gtk_box_pack_start(GTK_BOX(vbox), frame, FALSE, FALSE, 0);
-
+    /* General tab */
     label = gtk_label_new("General");
+    vbox = gtk_vbox_new(FALSE, 0);
     gtk_notebook_append_page(GTK_NOTEBOOK(notebook), vbox, label);
 
-    table = gtk_table_new(MAX_COMMANDS + 1, 2, FALSE);
-    label = gtk_label_new("Label");
-    gtk_table_attach(GTK_TABLE(table), label, 0, 1, 0, 1,
-                     GTK_EXPAND | GTK_FILL, 0, PADDING, 0);
-    label = gtk_label_new("Command");
-    gtk_table_attach(GTK_TABLE(table), label, 1, 2, 0, 1,
-                     GTK_EXPAND | GTK_FILL, 0, PADDING, 0);
-    for (i = 0; i < MAX_COMMANDS; i++)
-    {
-        cmd_labels[i] = gtk_entry_new();
-        if (opts->cmd_labels[i])
-            gtk_entry_set_text(GTK_ENTRY(cmd_labels[i]), opts->cmd_labels[i]);
-        gtk_table_attach(GTK_TABLE(table), cmd_labels[i], 0, 1, i + 1, i + 2,
-                         GTK_EXPAND | GTK_FILL, 0, PADDING, PADDING);
-        commands[i] = gtk_entry_new();
-        if (opts->commands[i])
-            gtk_entry_set_text(GTK_ENTRY(commands[i]), opts->commands[i]);
-        gtk_table_attach(GTK_TABLE(table), commands[i], 1, 2, i + 1, i + 2,
-                         GTK_EXPAND | GTK_FILL, 0, PADDING, PADDING);
-    }
-    scroll = gtk_scrolled_window_new(NULL, NULL);
-    gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(scroll),
-                                   GTK_POLICY_NEVER, GTK_POLICY_AUTOMATIC);
-    gtk_scrolled_window_add_with_viewport(GTK_SCROLLED_WINDOW(scroll), table);
+    /* General tab, Background frame */
+    frame = gtk_frame_new("Backgrounds");
+    gtk_container_set_border_width(GTK_CONTAINER(frame), PADDING);
+    gtk_box_pack_start(GTK_BOX(vbox), frame, FALSE, FALSE, 0);
+
+    table = gtk_table_new(2, 1, FALSE);
+    gtk_container_add(GTK_CONTAINER(frame), table);
+
+    /* General tab, Background frame, Set command */
+    label = gtk_label_new("Set command:");
+    gtk_misc_set_alignment(GTK_MISC(label), OPTION_LABEL_ALIGN_X, OPTION_LABEL_ALIGN_Y);
+    gtk_size_group_add_widget(group, label);
+    gtk_table_attach(GTK_TABLE(table), label, 0, 1, 0, 1, 0, 0, PADDING, 0);
+
+    set_command_entry = gtk_entry_new();
+    gtk_entry_set_text(GTK_ENTRY(set_command_entry), bbbm_options_get_set_command(options));
+    gtk_table_attach(GTK_TABLE(table), set_command_entry, 1, 2, 0, 1, GTK_EXPAND | GTK_FILL, 0, PADDING, 0);
+
+    /* General tab, Thumbnails frame */
+    frame = gtk_frame_new("Thumbnails");
+    gtk_container_set_border_width(GTK_CONTAINER(frame), PADDING);
+    gtk_box_pack_start(GTK_BOX(vbox), frame, FALSE, FALSE, 0);
+
+    table = gtk_table_new(2, 2, FALSE);
+    gtk_container_add(GTK_CONTAINER(frame), table);
+
+    /* General tab, Thumbnails frame, Thumbnail size (WxH) */
+    label = gtk_label_new("Thumbnail size:");
+    gtk_misc_set_alignment(GTK_MISC(label), OPTION_LABEL_ALIGN_X, OPTION_LABEL_ALIGN_Y);
+    gtk_size_group_add_widget(group, label);
+    gtk_table_attach(GTK_TABLE(table), label, 0, 1, 0, 1, 0, 0, PADDING, 0);
+
+    hbox = gtk_hbox_new(FALSE, PADDING);
+    gtk_table_attach(GTK_TABLE(table), hbox, 1, 2, 0, 1, GTK_EXPAND | GTK_FILL, 0, PADDING, 0);
+
+    thumb_width_entry = gtk_spin_button_new_with_range(1, BBBM_OPTIONS_MAX_THUMB_WIDTH, 1);
+    gtk_spin_button_set_value(GTK_SPIN_BUTTON(thumb_width_entry), bbbm_options_get_thumb_width(options));
+    gtk_box_pack_start(GTK_BOX(hbox), thumb_width_entry, TRUE, TRUE, 0);
+
+    label = gtk_label_new("x");
+    gtk_box_pack_start(GTK_BOX(hbox), label, FALSE, FALSE, 0);
+
+    thumb_height_entry = gtk_spin_button_new_with_range(1, BBBM_OPTIONS_MAX_THUMB_HEIGHT, 1);
+    gtk_spin_button_set_value(GTK_SPIN_BUTTON(thumb_height_entry), bbbm_options_get_thumb_height(options));
+    gtk_box_pack_start(GTK_BOX(hbox), thumb_height_entry, TRUE, TRUE, 0);
+
+    /* General tab, Thumbnails frame, Thumbnail columns */
+    label = gtk_label_new("Thumbnail columns:");
+    gtk_misc_set_alignment(GTK_MISC(label), OPTION_LABEL_ALIGN_X, OPTION_LABEL_ALIGN_Y);
+    gtk_size_group_add_widget(group, label);
+    gtk_table_attach(GTK_TABLE(table), label, 0, 1, 1, 2, 0, 0, PADDING, 0);
+
+    thumb_column_count_entry = gtk_spin_button_new_with_range(1, BBBM_OPTIONS_MAX_THUMB_COLUMN_COUNT, 1);
+    gtk_spin_button_set_value(GTK_SPIN_BUTTON(thumb_column_count_entry), bbbm_options_get_thumb_column_count(options));
+    gtk_table_attach(GTK_TABLE(table), thumb_column_count_entry, 1, 2, 1, 2, GTK_EXPAND | GTK_FILL, 0, PADDING, PADDING);
+
+    /* General tab, Menu options frame */
+    frame = gtk_frame_new("Menu options");
+    gtk_container_set_border_width(GTK_CONTAINER(frame), PADDING);
+    gtk_box_pack_start(GTK_BOX(vbox), frame, FALSE, FALSE, 0);
+
+    table = gtk_table_new(2, 1, FALSE);
+    gtk_container_add(GTK_CONTAINER(frame), table);
+
+    /* General tab, Menu options frame, Use filename as label */
+    filename_as_label_check_button = gtk_check_button_new_with_mnemonic("Use filename as _label");
+    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(filename_as_label_check_button), bbbm_options_get_filename_as_label(options));
+    gtk_table_attach(GTK_TABLE(table), filename_as_label_check_button, 0, 1, 0, 1, GTK_EXPAND | GTK_FILL, 0, PADDING, 0);
+
+    /* General tab, Menu options frame, Use filename as title */
+    filename_as_title_check_button = gtk_check_button_new_with_mnemonic("Use filename as _title");
+    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(filename_as_title_check_button), bbbm_options_get_filename_as_title(options));
+    gtk_table_attach(GTK_TABLE(table), filename_as_title_check_button, 0, 1, 1, 2, GTK_EXPAND | GTK_FILL, 0, PADDING, 0);
+
+    /* Commands tab */
+    command_count = bbbm_options_get_current_command_count(options);
+    commands       = g_malloc(command_count * sizeof(GtkWidget *));
+    command_labels = g_malloc(command_count * sizeof(GtkWidget *));
+    /* clear the commands and command labels */
+    memset(commands,       0, command_count * sizeof(GtkWidget *));
+    memset(command_labels, 0, command_count * sizeof(GtkWidget *));
 
     label = gtk_label_new("Commands");
-    gtk_notebook_append_page(GTK_NOTEBOOK(notebook), scroll, label);
+    table = gtk_table_new(command_count + 1, 2, FALSE);
+    scrolled_window = gtk_scrolled_window_new(NULL, NULL);
+    gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(scrolled_window), GTK_POLICY_NEVER, GTK_POLICY_AUTOMATIC);
+    gtk_scrolled_window_add_with_viewport(GTK_SCROLLED_WINDOW(scrolled_window), table);
+    gtk_notebook_append_page(GTK_NOTEBOOK(notebook), scrolled_window, label);
 
-    gtk_box_pack_start(GTK_BOX(GTK_DIALOG(dialog)->vbox), notebook,
-                       FALSE, FALSE, 0);
+    label = gtk_label_new("Label");
+    gtk_table_attach(GTK_TABLE(table), label, 0, 1, 0, 1, GTK_EXPAND | GTK_FILL, 0, PADDING, 0);
+    label = gtk_label_new("Command");
+    gtk_table_attach(GTK_TABLE(table), label, 1, 2, 0, 1, GTK_EXPAND | GTK_FILL, 0, PADDING, 0);
+
+    for (i = 0; i < command_count; i++) {
+        const gchar *command       = bbbm_options_get_command(options, i);
+        const gchar *command_label = bbbm_options_get_command_label(options, i);
+
+        command_labels[i] = gtk_entry_new();
+        if (command_label) {
+            gtk_entry_set_text(GTK_ENTRY(command_labels[i]), command_label);
+        }
+        gtk_table_attach(GTK_TABLE(table), command_labels[i], 0, 1, i + 1, i + 2, GTK_EXPAND | GTK_FILL, 0, PADDING, PADDING);
+        commands[i] = gtk_entry_new();
+        if (command) {
+            gtk_entry_set_text(GTK_ENTRY(commands[i]), command);
+        }
+        gtk_table_attach(GTK_TABLE(table), commands[i], 1, 2, i + 1, i + 2, GTK_EXPAND | GTK_FILL, 0, PADDING, PADDING);
+    }
+
+    gtk_box_pack_start(GTK_BOX(GTK_DIALOG(dialog)->vbox), notebook, FALSE, FALSE, 0);
     gtk_widget_show_all(dialog);
-    
-    if (gtk_dialog_run(GTK_DIALOG(dialog)) == GTK_RESPONSE_OK)
-    {
-        const gchar *set_cmd = gtk_entry_get_text(GTK_ENTRY(set_entry));
-        const gchar *view_cmd = gtk_entry_get_text(GTK_ENTRY(view_entry));
-        gint thumb_width =
-                gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(width_entry));
-        gint thumb_height =
-               gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(height_entry));
-        gint thumb_cols =
-                 gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(cols_entry));
-        gboolean filename_label =
-                  gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(label_check));
-        gboolean filename_title =
-                  gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(title_check));
-        const gchar *cmds[MAX_COMMANDS];
-        const gchar *labels[MAX_COMMANDS];
-        for (i = 0; i < MAX_COMMANDS; i++)
-        {
-            labels[i] = gtk_entry_get_text(GTK_ENTRY(cmd_labels[i]));
-            cmds[i] = gtk_entry_get_text(GTK_ENTRY(commands[i]));
-        }
 
-        if (strcmp(set_cmd, opts->set_cmd))
-        {
-            g_free(opts->set_cmd);
-            opts->set_cmd = g_strdup(set_cmd);
-            result |= OPTIONS_SET_CMD_CHANGED;
+    if (gtk_dialog_run(GTK_DIALOG(dialog)) == GTK_RESPONSE_OK) {
+        const gchar *set_command;
+        gint thumb_width;
+        gint thumb_height;
+        gint thumb_column_count;
+        gboolean filename_as_label;
+        gboolean filename_as_title;
+
+        set_command        = gtk_entry_get_text(GTK_ENTRY(set_command_entry));
+        thumb_width        = gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(thumb_width_entry));
+        thumb_height       = gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(thumb_height_entry));
+        thumb_column_count = gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(thumb_column_count_entry));
+        filename_as_label  = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(filename_as_label_check_button));
+        filename_as_title  = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(filename_as_title_check_button));
+
+        if (bbbm_options_set_set_command(options, set_command)) {
+            result |= OPTIONS_SET_COMMAND_CHANGED;
         }
-        if (strcmp(view_cmd, opts->view_cmd))
-        {
-            g_free(opts->view_cmd);
-            opts->view_cmd = g_strdup(view_cmd);
-            result |= OPTIONS_VIEW_CMD_CHANGED;
-        }
-        if (thumb_width != opts->thumb_width ||
-            thumb_height != opts->thumb_height)
-        {
-            opts->thumb_width = thumb_width;
-            opts->thumb_height = thumb_height;
+        if (bbbm_options_set_thumb_size(options, thumb_width, thumb_height)) {
             result |= OPTIONS_THUMB_SIZE_CHANGED;
         }
-        if (thumb_cols != opts->thumb_cols)
-        {
-            opts->thumb_cols = thumb_cols;
-            result |= OPTIONS_THUMB_COLS_CHANGED;
+        if (bbbm_options_set_thumb_column_count(options, thumb_column_count)) {
+            result |= OPTIONS_THUMB_COLUMN_COUNT_CHANGED;
         }
-        if (filename_label != opts->filename_label)
-        {
-            opts->filename_label = filename_label;
-            result |= OPTIONS_FILENAME_LABEL_CHANGED;
+        if (bbbm_options_set_filename_as_label(options, filename_as_label)) {
+            result |= OPTIONS_FILENAME_AS_LABEL_CHANGED;
         }
-        if (filename_title != opts->filename_title)
-        {
-            opts->filename_title = filename_title;
-            result |= OPTIONS_FILENAME_TITLE_CHANGED;
+        if (bbbm_options_set_filename_as_title(options, filename_as_title)) {
+            result |= OPTIONS_FILENAME_AS_TITLE_CHANGED;
         }
-        for (i = 0; i < MAX_COMMANDS; i++)
-        {
-            if (opts->cmd_labels[i])
-            {
-                if (strcmp(labels[i], opts->cmd_labels[i]))
-                {
-                    g_free(opts->cmd_labels[i]);
-                    // store if filled in, or make NULL otherwise
-                    if (strlen(labels[i]) > 0)
-                        opts->cmd_labels[i] = g_strdup(labels[i]);
-                    else
-                        opts->cmd_labels[i] = NULL;
-                    result |= OPTIONS_COMMAND_CHANGED;
-                }
-                // else the same, don't do anything
+        for (i = 0; i < command_count; i++) {
+            const gchar *command;
+            const gchar *command_label;
+
+            command       = gtk_entry_get_text(GTK_ENTRY(commands[i]));
+            command_label = gtk_entry_get_text(GTK_ENTRY(command_labels[i]));
+            if (bbbm_options_set_command(options, i, command)) {
+                result |= OPTIONS_COMMANDS_CHANGED;
             }
-            else if (strlen(labels[i]) > 0)
-            {
-                // was NULL, will be something now
-                opts->cmd_labels[i] = g_strdup(labels[i]);
-                result |= OPTIONS_COMMAND_CHANGED;
+            if (bbbm_options_set_command_label(options, i, command_label)) {
+                result |= OPTIONS_COMMANDS_CHANGED;
             }
-            // else opts->cmd_labels[i] == NULL and labels[i] is empty, ignore
-            if (opts->commands[i])
-            {
-                if (strcmp(cmds[i], opts->commands[i]))
-                {
-                    g_free(opts->commands[i]);
-                    // store if filled in, or make NULL otherwise
-                    if (strlen(cmds[i]) > 0)
-                        opts->commands[i] = g_strdup(cmds[i]);
-                    else
-                        opts->commands[i] = NULL;
-                    result |= OPTIONS_COMMAND_CHANGED;
-                }
-                // else the same, don't do anything
-            }
-            else if (strlen(cmds[i]) > 0)
-            {
-                // was NULL, will be something now
-                opts->commands[i] = g_strdup(cmds[i]);
-                result |= OPTIONS_COMMAND_CHANGED;
-            }
-            // else opts->commands[i] == NULL and cmds[i] is empty, ignore
         }
     }
     gtk_widget_destroy(dialog);
+    g_free(commands);
+    g_free(command_labels);
+
     return result;
 }
 
-void bbbm_dialogs_about(GtkWindow *parent)
-{
-    static const gchar *about = "bbbm "VERSION"\nWritten by Rob Spoor\n\n"
-                                "CopyRight (C) 2004-2015 Rob Spoor";
-    GtkWidget *dialog = gtk_message_dialog_new(parent, 0, GTK_MESSAGE_INFO,
-                                               GTK_BUTTONS_OK, "%s", about);
+void bbbm_dialogs_about(GtkWindow *parent) {
+    static const gchar *about = PACKAGE_STRING"\nWritten by Rob Spoor\n\n"BBBM_COPYRIGHT;
+
+    GtkWidget *dialog;
+
+    dialog = gtk_message_dialog_new(parent, 0, GTK_MESSAGE_INFO, GTK_BUTTONS_OK, "%s", about);
     gtk_window_set_title(GTK_WINDOW(dialog), "About");
     gtk_dialog_run(GTK_DIALOG(dialog));
     gtk_widget_destroy(dialog);
 }
 
-gint bbbm_dialogs_move(GtkWindow *parent, const gchar *title, guint limit)
-{
+gint bbbm_dialogs_move(GtkWindow *parent, const gchar *title, guint limit) {
     gint result = -1;
     GtkWidget *dialog, *frame, *table, *label, *entry;
-    GtkObject *adj;
 
     dialog = gtk_dialog_new_with_buttons(title, parent,
-                                         GTK_DIALOG_NO_SEPARATOR,
+                                         GTK_DIALOG_MODAL | GTK_DIALOG_DESTROY_WITH_PARENT | GTK_DIALOG_NO_SEPARATOR,
                                          GTK_STOCK_OK, GTK_RESPONSE_OK,
                                          GTK_STOCK_CANCEL, GTK_RESPONSE_CANCEL,
                                          NULL);
+
+    label = gtk_label_new("Moving step:");
+
+    entry = gtk_spin_button_new_with_range(1, limit, 1);
+    gtk_spin_button_set_value(GTK_SPIN_BUTTON(entry), 1);
+
+    table = gtk_table_new(1, 2, FALSE);
+    gtk_table_attach(GTK_TABLE(table), label, 0, 1, 0, 1, 0, 0, PADDING, 0);
+    gtk_table_attach(GTK_TABLE(table), entry, 1, 2, 0, 1, GTK_EXPAND | GTK_FILL, 0, PADDING, PADDING);
+
     frame = gtk_frame_new(title);
     gtk_container_set_border_width(GTK_CONTAINER(frame), PADDING);
-    table = gtk_table_new(1, 2, FALSE);
-    label = gtk_label_new("Moving step:");
-    gtk_table_attach(GTK_TABLE(table), label, 0, 1, 0, 1, 0, 0, PADDING, 0);
-    adj = gtk_adjustment_new(1, 1, limit, 1, 1, 1);
-    entry = gtk_spin_button_new(GTK_ADJUSTMENT(adj), 1, 0);
-    gtk_table_attach(GTK_TABLE(table), entry, 1, 2, 0, 1,
-                     GTK_EXPAND | GTK_FILL, 0, PADDING, PADDING);
     gtk_container_add(GTK_CONTAINER(frame), table);
-    gtk_widget_show_all(frame);
-    gtk_box_pack_start(GTK_BOX(GTK_DIALOG(dialog)->vbox), frame,
-                       FALSE, FALSE, 0);
 
-    if (gtk_dialog_run(GTK_DIALOG(dialog)) == GTK_RESPONSE_OK)
+    gtk_box_pack_start(GTK_BOX(GTK_DIALOG(dialog)->vbox), frame, FALSE, FALSE, 0);
+    gtk_widget_show_all(dialog);
+
+    if (gtk_dialog_run(GTK_DIALOG(dialog)) == GTK_RESPONSE_OK) {
         result = gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(entry));
+    }
     gtk_widget_destroy(dialog);
     return result;
 }
 
-gchar *bbbm_dialogs_edit(GtkWindow *parent, const gchar *initial)
-{
+gchar *bbbm_dialogs_edit_description(GtkWindow *parent, const gchar *initial) {
     gchar *result = NULL;
     GtkWidget *dialog, *frame, *table, *entry;
 
     dialog = gtk_dialog_new_with_buttons("Edit description", parent,
-                                         GTK_DIALOG_NO_SEPARATOR,
+                                         GTK_DIALOG_MODAL | GTK_DIALOG_DESTROY_WITH_PARENT | GTK_DIALOG_NO_SEPARATOR,
                                          GTK_STOCK_OK, GTK_RESPONSE_OK,
                                          GTK_STOCK_CANCEL, GTK_RESPONSE_CANCEL,
                                          NULL);
+
+    entry = gtk_entry_new();
+    if (initial != NULL) {
+        gtk_entry_set_text(GTK_ENTRY(entry), initial);
+    }
+
+    table = gtk_table_new(1, 1, FALSE);
+    gtk_table_attach(GTK_TABLE(table), entry, 0, 1, 1, 2, GTK_EXPAND | GTK_FILL, 0, PADDING, PADDING);
+
     frame = gtk_frame_new("Description:");
     gtk_container_set_border_width(GTK_CONTAINER(frame), PADDING);
-    table = gtk_table_new(1, 1, FALSE);
-    entry = gtk_entry_new();
-    if (initial)
-        gtk_entry_set_text(GTK_ENTRY(entry), initial);
-    gtk_table_attach(GTK_TABLE(table), entry, 0, 1, 1, 2,
-                     GTK_EXPAND | GTK_FILL, 0, PADDING, PADDING);
     gtk_container_add(GTK_CONTAINER(frame), table);
-    gtk_widget_show_all(frame);
-    gtk_box_pack_start(GTK_BOX(GTK_DIALOG(dialog)->vbox), frame,
-                       FALSE, FALSE, 0);
 
-    if (gtk_dialog_run(GTK_DIALOG(dialog)) == GTK_RESPONSE_OK)
+    gtk_box_pack_start(GTK_BOX(GTK_DIALOG(dialog)->vbox), frame, FALSE, FALSE, 0);
+    gtk_widget_show_all(dialog);
+
+    if (gtk_dialog_run(GTK_DIALOG(dialog)) == GTK_RESPONSE_OK) {
         result = g_strdup(gtk_entry_get_text(GTK_ENTRY(entry)));
+    }
     gtk_widget_destroy(dialog);
     return result;
+}
+
+static gboolean bbbm_dialogs_confirm_overwrite(GtkWindow *parent, const gchar *file) {
+    return bbbm_dialogs_question(parent, "Overwrite?", "File '%s' exists. Overwrite?", file);
 }

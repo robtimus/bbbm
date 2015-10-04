@@ -26,124 +26,135 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <glib.h>
+#include "config.h"
 #include "util.h"
 
 static gboolean bbbm_util_has_ext(const gchar *file, const gchar *ext);
 
-gboolean bbbm_util_is_image(const gchar *filename)
-{
-    static const gchar *extensions[] =
-                               {".jpg", ".jpeg", ".gif", ".ppm", ".pgm", NULL};
-    guint i;
-    if (!g_file_test(filename, G_FILE_TEST_IS_REGULAR))
+gboolean bbbm_str_empty(const gchar *str) {
+    return str == NULL || *str == '\0';
+}
+
+gboolean bbbm_str_equals(const gchar *str1, const gchar *str2) {
+    if (str1 == NULL && str2 == NULL) {
+        return TRUE;
+    }
+    if (str1 == NULL || str2 == NULL) {
         return FALSE;
-    for (i = 0; extensions[i]; ++i)
-        if (bbbm_util_has_ext(filename, extensions[i]))
+    }
+    return strcmp(str1, str2) == 0;
+}
+
+gboolean bbbm_util_is_image(const gchar *filename) {
+    static const gchar *extensions[] = { ".jpg", ".jpeg", ".gif", ".ppm", ".pgm", NULL };
+    guint i;
+
+    if (!g_file_test(filename, G_FILE_TEST_IS_REGULAR)) {
+        return FALSE;
+    }
+    for (i = 0; extensions[i] != NULL; ++i) {
+        if (bbbm_util_has_ext(filename, extensions[i])) {
             return TRUE;
+        }
+    }
     return FALSE;
 }
 
-gchar *bbbm_util_get_command(const gchar *command, const gchar *filename)
-{
-    // FIXME: I still want %1 replacement, which can be put in here
-    // For now, return the command with the filename appended between ""
-
+gchar *bbbm_util_get_command(const gchar *command, const gchar *filename) {
     gchar *start, *end;
-    start = (gchar *)command;
+
+    start = (gchar *) command;
     end = strstr(start, "%1");
 
-    if (end)
-    {
+    if (end != NULL) {
         GString *result = g_string_sized_new(1024);
-        while (end)
-        {
-            while (start != end)
+        while (end != NULL) {
+            while (start != end) {
                 result = g_string_append_c(result, *start++);
+            }
             result = g_string_append(result, filename);
             start += 2;
             end = strstr(start, "%1");
         }
-        // copy the rest
-        while (*start)
+        /* copy the rest */
+        while (*start != '\0') {
             result = g_string_append_c(result, *start++);
+        }
         return g_string_free(result, FALSE);
+    } else {
+        /* no %1 in the command, so add the filename to the end */
+        return g_strdup_printf("%s \"%s\"", command, filename);
     }
-    else
-        // no %1 in the command, so add the filename to the end
-        return g_strconcat(command, " \"", filename, "\"", NULL);
 }
 
-void bbbm_util_execute(const gchar *command, const gchar *filename)
-{
-    gchar *cmd = bbbm_util_get_command(command, filename);
+void bbbm_util_execute(const gchar *command, const gchar *filename) {
+    gchar *cmd;
+
+    cmd = bbbm_util_get_command(command, filename);
     bbbm_util_execute_cmd(cmd);
     g_free(cmd);
 }
 
-void bbbm_util_execute_cmd(const gchar *command)
-{
+void bbbm_util_execute_cmd(const gchar *command) {
     pid_t pid;
-    if (!command || !strcmp(command, ""))
-    {
+
+    g_debug("executing command '%s'", command);
+    if (bbbm_str_empty(command)) {
         return;
     }
-    if (!(pid = fork()))
-    {
-        gint ret;
+#if HAVE_FORK != 1
+    #error fork is not defined
+#endif
+#if HAVE_WORKING_FORK != 1
+    #error fork does not work
+#endif
+    pid = fork();
+    if (pid == 0) {
         /* use system instead of exec* for less strict commands */
-       if ((ret = system(command)) == -1)
-       {
-           fprintf(stderr, "bbbm: could not execute '%s': %s\n",
-                   command, g_strerror(errno));
-       }
-       exit(WEXITSTATUS(ret));
-    }
-    else if (pid == -1)
-    {
-        fprintf(stderr, "bbbm: could not execute '%s': %s\n",
-                command, g_strerror(errno));
+        gint result;
+
+        result = system(command);
+        if (result == -1) {
+            g_critical("could not execute '%s': %s", command, g_strerror(errno));
+        }
+        exit(WEXITSTATUS(result));
+    } else if (pid == -1) {
+        g_critical("could not execute '%s': %s", command, g_strerror(errno));
     }
 }
 
-gchar *bbbm_util_dirname(const gchar *filename)
-{
-    gchar *dir = g_path_get_dirname(filename);
-    gchar *dirname = g_strconcat(dir, "/", NULL);
+gchar *bbbm_util_dirname(const gchar *filename) {
+    gchar *dir, *dirname;
+
+    dir = g_path_get_dirname(filename);
+    dirname = g_strconcat(dir, "/", NULL);
     g_free(dir);
     return dirname;
 }
 
-gchar *bbbm_util_absolute_path(const gchar *path)
-{
-    if (g_file_test(path, G_FILE_TEST_IS_DIR))
-    {
-        gchar *current = g_get_current_dir();
-        gchar *dir;
-        if (chdir(path) == -1)
-        {
-           fprintf(stderr, "bbbm: could not change directory to '%s': %s\n",
-                   path, g_strerror(errno));
+gchar *bbbm_util_absolute_path(const gchar *path) {
+    if (g_file_test(path, G_FILE_TEST_IS_DIR)) {
+        gchar *current, *dir;
+
+        current = g_get_current_dir();
+        if (chdir(path) == -1) {
+            g_warning("could not change directory to '%s': %s", path, g_strerror(errno));
             g_free(current);
             return g_strdup(path);
         }
         dir = g_get_current_dir();
-	if (chdir(current) == -1)
-        {
-           fprintf(stderr, "bbbm: could not change directory to '%s': %s\n",
-                   current, g_strerror(errno));
+        if (chdir(current) == -1) {
+           g_warning("could not change directory to '%s': %s", current, g_strerror(errno));
         }
         g_free(current);
         return dir;
-    }
-    else
-    {
-        gchar *current = g_get_current_dir();
-        gchar *dir = g_path_get_dirname(path);
-        gchar *file, *abs;
-        if (chdir(dir) == -1)
-        {
-           fprintf(stderr, "bbbm: could not change directory to '%s': %s\n",
-                   dir, g_strerror(errno));
+    } else {
+        gchar *current, *dir, *file, *absolute_file;
+
+        current = g_get_current_dir();
+        dir = g_path_get_dirname(path);
+        if (chdir(dir) == -1) {
+            g_warning("could not change directory to '%s': %s", dir, g_strerror(errno));
             g_free(current);
             g_free(dir);
             return g_strdup(path);
@@ -151,56 +162,56 @@ gchar *bbbm_util_absolute_path(const gchar *path)
         g_free(dir);
         dir = g_get_current_dir();
         file = g_path_get_basename(path);
-        abs = g_strjoin("/", dir, file, NULL);
-        if (chdir(current) == -1)
-        {
-           fprintf(stderr, "bbbm: could not change directory to '%s': %s\n",
-                   current, g_strerror(errno));
+        absolute_file = g_strjoin("/", dir, file, NULL);
+        if (chdir(current) == -1) {
+           g_warning("could not change directory to '%s': %s", current, g_strerror(errno));
         }
         g_free(current);
         g_free(dir);
         g_free(file);
-        return abs;
+        return absolute_file;
     }
 }
 
-GList *bbbm_util_listdir(const gchar *dir)
-{
+GList *bbbm_util_listdir(const gchar *dir) {
     GList *files = NULL;
     GError *error = NULL;
     const gchar *entry;
-    GDir *d = g_dir_open(dir, 0, &error);
-    if (!d)
-    {
-        fprintf(stderr, "bbbm: could not open dir '%s' for reading: %s\n",
-                dir, error->message);
+    GDir *d;
+
+    d = g_dir_open(dir, 0, &error);
+    if (d == NULL) {
+        g_critical("could not open dir '%s' for reading: %s", dir, error->message);
         g_error_free(error);
         return NULL;
     }
-    while ((entry = g_dir_read_name(d)))
-    {
-        gchar *file = g_strconcat(dir, "/", entry, NULL);
-        if (g_file_test(file, G_FILE_TEST_IS_REGULAR))
+    while ((entry = g_dir_read_name(d)) != NULL) {
+        gchar *file;
+
+        file = g_strjoin("/", dir, entry, NULL);
+        if (g_file_test(file, G_FILE_TEST_IS_REGULAR)) {
             files = g_list_append(files, bbbm_util_absolute_path(file));
+        }
         g_free(file);
     }
     g_dir_close(d);
     return files;
 }
 
-static gboolean bbbm_util_has_ext(const gchar *file, const gchar *ext)
-{
+static gboolean bbbm_util_has_ext(const gchar *file, const gchar *ext) {
     /* code inspired by GLib's g_str_has_suffix */
-    gint file_len, ext_len;
+    size_t file_len, ext_len;
 
-    if (!file)
+    if (bbbm_str_empty(file)) {
         return FALSE;
-    if (!ext)
+    }
+    if (bbbm_str_empty(ext)) {
         return TRUE;
+    }
     file_len = strlen(file);
     ext_len = strlen(ext);
-    if (file_len < ext_len)
+    if (file_len < ext_len) {
         return FALSE;
+    }
     return strcmp(file + file_len - ext_len, ext) == 0;
 }
-

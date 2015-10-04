@@ -1,0 +1,125 @@
+bbbm ChangeLog
+----------------------------------------
+
+0.8 (2015-xx-xx)
+----------------
+ - Moved from SourceForge to GitHub.
+ - The build process has been changed to use ./configure.
+ - Converted the configuration to use XML. A utility tool (tools/migrate.py) has
+   been provided to convert any existing configuration file.
+ - The "view" command has been dropped in favor of a custom command
+ - Added an option to specify a custom configuration file.
+ - Added confirmation before deleting images.
+
+0.7.3 (2015-08-23)
+------------------
+ - Fixed the command in created Blackbox menus if the set command contains %1
+ - Fixed Makefile to work on newer systems
+ - Removed some compiler warnings
+
+0.7.2 (2007-05-12)
+------------------
+ - Improved layout of the options dialog a bit
+ - Useless menu items are now disabled, such as closing when no file is opened
+   or sorting when there are no images. Creating empty lists, menus or
+   collections is still allowed though
+
+0.7.1 (2007-03-05)
+------------------
+ - Increased the default number of extra commands from 5 to 10. A scroll pane
+   makes sure the layout is kept intact, no matter the number of commands
+ - Added "Add Image List..." to Edit menu, which adds all supported images in
+   a text file. This file should have one image file per line
+ - Improved command handling. Each %1 inside the command will be replaced by
+   the image filename. If there is no %1, the image filename will be appended
+   to the command as before
+
+0.7 (2007-03-04)
+----------------
+ - Added multiple commands that can be executed for an image
+
+0.6.2 (2005-03-23)
+------------------
+ - Fixed a bug that caused the Set and View options to be messed up when they
+   were modified (with thanks to Kevin Tomasek)
+
+0.6.1 (2004-07-03)
+------------------
+ - Fixed a bug that caused bbbm to crash when trying to open or add an
+   unreadable collection
+
+0.6 (2004-06-29)
+----------------
+ - Changed creation of images; instead of using external ImageMagick command,
+   gdk-pixbuf is used
+
+0.5 (2004-06-24)
+----------------
+ - Rewrote great parts for greater readability
+ - Thumbnail size format is checked when reading the config file
+ - Added limits to the thumbnail size (screen size)
+ - Thumbnail size is split in width and height entries in the Options dialog
+ - Slightly changed some menu item labels
+ - Set filename status of unnamed collections to "Untitled"
+ - Added boolean options "Include filename as label" (filename_label) and
+   "Include filename as title" (filename_title), which set the menu label /
+   title of created Blackbox menus to the basename of the currently opened
+   collection.
+   The configuration file is updated automatically for these options
+
+0.4.2 (2004-06-22)
+------------------
+ - Added support for long filenames in the created Blackbox menu (i.e. with
+   spaces and characters \, (, ), { and })
+
+0.4.1 (2004-06-21)
+------------------
+ - Zombie child processes are cleaned up now
+ - Added modified status (indicated by an asterisk behind the filename)
+ - Added confirmation when closing a modified collection
+
+0.4 (2004-06-03)
+----------------
+ - Fixed a bug in the Makefile that did not remove /usr/local/bin/bbbm, but
+   tried to remove /usr/local/bbbm instead
+ - Fixed a bug that (might) let the program crash if executing the set or view
+   command would produce an error; the error is now printed to stderr
+ - Using absolute, normalized paths now (i.e. no more /../ or /./)
+ - Added "Sort On Filename" and "Sort On Description" to Edit menu. Sorting is
+   done lexicographically
+
+0.3.1 (2004-05-31)
+------------------
+ - Improved file manager behaviour; makes it easier to jump to directories just
+   by typing the name (with thanks to Jari Aalto)
+
+0.3 (2004-05-30)
+----------------
+ - Complete rewrite in C (which should make bbbm1 redundant)
+ - No longer center bbbm by default, but let the window manager decide
+ - Fixed a bug that changed the current filename if a collection was added
+ - When changing the thumb size, the current thumbs are finally resized
+ - Introduced less strict config file parsing; whitespace is no longer an issue
+ - Added "Add Directory..." to Edit menu, which adds all supported images in
+   the selected directory
+ - Added "Move Back..." and "Move Forward..." to image popup menu
+ - "Insert..." can now insert multiple images
+ - Added support for commands with spaces in them
+ - Added an overwrite check when writing to a file
+ - No longer exits a file chooser when nothing is done; the only way to close
+   it now is either pressing Cancel, or successfully select a file / directory
+ - Extended the statusbar to show the filename of the currently opened
+   collection as well
+ - Changed accelerator for "Add Collection" to CTRL+C
+
+0.2 (2004-03-31)
+----------------
+ - Fixed a bug in the configuration file reading
+ - Introduced more error checking; no checking on file permissions though
+ - Set scrollbar policy to automatic
+ - Added inserting functionality
+ - Changed accelerator for "Close" to CTRL+X
+
+0.1 (2004-03-27)
+----------------
+ - Initial version
