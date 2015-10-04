@@ -20,13 +20,21 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <getopt.h>
 #include <sys/stat.h>
+#include <sys/wait.h>
 #include <gtk/gtk.h>
 #include "options.h"
 #include "bbbm.h"
 
 gchar *EXTENSIONS[] = BBBM_EXTENSIONS;
+
+static void clean_up_child_process(int signal_number)
+{
+    // wait for any child
+    wait(NULL);
+}
 
 int main(int argc, char *argv[])
 {
@@ -43,6 +51,11 @@ int main(int argc, char *argv[])
     gchar config[PATH_MAX];
     gchar thumbsdir[PATH_MAX];
     BBBM *bbbm;
+
+    struct sigaction sigchld_action;
+    memset(&sigchld_action, 0, sizeof(sigchld_action));
+    sigchld_action.sa_handler = clean_up_child_process;
+    sigaction(SIGCHLD, &sigchld_action, NULL);
 
     gtk_init(&argc, &argv);
 

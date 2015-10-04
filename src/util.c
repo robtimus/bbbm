@@ -68,32 +68,40 @@ gint bbbm_util_makedirs(const gchar *dir)
 gchar *bbbm_util_absolute_path(const gchar *path)
 {
     gchar *dir, *file, *abs, *current;
-
-    dir = g_path_get_dirname(path);
-    file = g_path_get_basename(path);
-    if (path[strlen(path) - 1] == '/')
+    if (g_file_test(path, G_FILE_TEST_IS_DIR))
     {
-        // dir and file will be the same! e.g. /usr/ leads to /usr and usr
-        gchar *dir2 = g_path_get_dirname(dir);
-        g_free(dir);
-        dir = dir2;
+        current = g_get_current_dir();
+        if (chdir(path) == -1)
+        {
+            g_free(current);
+            return g_strdup(path);
+        }
+        dir = g_get_current_dir();
+        chdir(current);
+        g_free(current);
+        return dir;
     }
-    current = g_get_current_dir();
-    if (chdir(dir) == -1)
+    else
     {
+        dir = g_path_get_dirname(path);
+        file = g_path_get_basename(path);
+        current = g_get_current_dir();
+        if (chdir(dir) == -1)
+        {
+            g_free(dir);
+            g_free(file);
+            g_free(current);
+            return g_strdup(path);
+        }
+        g_free(dir);
+        dir = g_get_current_dir();
+        abs = g_strjoin("/", dir, file, NULL);
+        chdir(current);
+        g_free(current);
         g_free(dir);
         g_free(file);
-        g_free(current);
-        return g_strdup(path);
+        return abs;
     }
-    g_free(dir);
-    dir = g_get_current_dir();
-    abs = g_strjoin("/", dir, file, NULL);
-    chdir(current);
-    g_free(current);
-    g_free(dir);
-    g_free(file);
-    return abs;
 }
 
 GList *bbbm_util_listdir(const gchar *dir)

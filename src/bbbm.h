@@ -21,8 +21,7 @@
 #ifndef __BBBM_H_
 #define __BBBM_H_
 
-#define VERSION         "0.4"
-#define CAPTION         "bbbm "VERSION
+#define VERSION         "0.4.1"
 #define BBBM_DIR        "/.bbbm"
 #define BBBM_CONFIG     "/bbbm.cfg"
 #define BBBM_THUMBS     "/thumbs"
@@ -42,6 +41,7 @@ typedef struct
     const gchar *thumbsdir; // the thumbs directory
     gchar *filename; // the current filename, or NULL
     struct options *opts; // the options
+    gboolean modified; // whether the current collection was modified
     GList *images; // a list of images
     GtkWidget *window; // the window
     GtkWidget *table; // the table
@@ -66,5 +66,8 @@ void bbbm_reorder(BBBM *bbbm, guint index);
 
 /* Resizes all thumbs of the given BBBM application. */
 void bbbm_resize_thumbs(BBBM *bbbm);
+
+/* Sets the modified status of the given BBBM application. */
+void bbbm_set_modified(BBBM *bbbm, gboolean modified);
 
 #endif /* __BBBM_H_ */

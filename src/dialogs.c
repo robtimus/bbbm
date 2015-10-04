@@ -209,6 +209,7 @@ void bbbm_edit_description_dialog(BBBMImage *image)
         {
             g_free(image->description);
             image->description = g_strdup(desc);
+            bbbm_set_modified(image->bbbm, TRUE);
         }
     }
     gtk_widget_destroy(dialog);

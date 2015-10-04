@@ -29,7 +29,7 @@ BBBMImage *bbbm_image_new(BBBM* bbbm, const gchar *filename,
     gtk_widget_show(image);
     bbbm_image->bbbm = bbbm;
     bbbm_image->box = gtk_event_box_new();
-    gtk_container_add(GTK_CONTAINER(BBBM_WIDGET(bbbm_image)), image);
+    gtk_container_add(GTK_CONTAINER(bbbm_image->box), image);
     bbbm_image->filename = g_strdup(filename);
     bbbm_image->description = g_strdup(description);
     return bbbm_image;

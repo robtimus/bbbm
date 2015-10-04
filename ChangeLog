@@ -1,6 +1,12 @@
 bbbm ChangeLog
 ----------------------------------------
 
+0.4.1
+-----
+ - Zombie child processes are cleaned up now
+ - Added modified status (indicated by an asterisk behind the filename)
+ - Added confirmation when closing a modified collection
+
 0.4
 ----
  - Fixed a bug in the Makefile that did not remove /usr/local/bin/bbbm, but

@@ -49,6 +49,8 @@ static gint bbbm_create_menu(BBBM *, const gchar *);
 static gint bbbm_compare_filename(gconstpointer, gconstpointer);
 static gint bbbm_compare_description(gconstpointer, gconstpointer);
 
+static inline gboolean bbbm_can_close(BBBM *);
+static inline void bbbm_close_collection(BBBM *);
 static inline gboolean bbbm_ask_overwrite(BBBM *, const gchar *);
 static inline void bbbm_error_message(BBBM *, const gchar *);
 static inline gboolean bbbm_is_image(const gchar *);
@@ -57,13 +59,13 @@ static inline GtkWidget *create_chooser(BBBM *, const gchar *, gboolean,
 static inline void bbbm_execute(const gchar *, gchar *);
 
 static GtkWidget *bbbm_create_menu_bar(BBBM *);
-static void bbbm_set_status(GtkWidget *, GdkEvent *, BBBMImage *);
-static void bbbm_clear_status(GtkWidget *, GdkEvent *, BBBM *);
+static gboolean bbbm_set_status(GtkWidget *, GdkEvent *, BBBMImage *);
+static gboolean bbbm_clear_status(GtkWidget *, GdkEvent *, BBBM *);
 static void bbbm_open(BBBM *);
 static void bbbm_open_collection(BBBM *, const gchar *);
 static void bbbm_save(BBBM *);
 static void bbbm_close(BBBM *);
-static void bbbm_exit_window(GtkWidget *, GdkEvent *, BBBM *);
+static gboolean bbbm_exit_window(GtkWidget *, GdkEvent *, BBBM *);
 static void bbbm_exit(BBBM *);
 static void bbbm_add_image(BBBM *);
 static void bbbm_add_image0(BBBM *, gchar *, gchar *, gint);
@@ -73,8 +75,8 @@ static void bbbm_add_collection0(BBBM *, const gchar *);
 static void bbbm_create(BBBM *, gint);
 static void bbbm_random_background(BBBM *);
 static void bbbm_sort_images(BBBM *, gint);
-static void bbbm_set_image(GtkWidget *, GdkEvent *, BBBMImage *);
-static void bbbm_popup(GtkWidget *, GdkEventButton *, BBBMImage *);
+static gboolean bbbm_set_image(GtkWidget *, GdkEvent *, BBBMImage *);
+static gboolean bbbm_popup(GtkWidget *, GdkEventButton *, BBBMImage *);
 static void bbbm_set(BBBMImage *);
 static void bbbm_view(BBBMImage *);
 static void bbbm_move_back(BBBMImage *, gint);
@@ -93,11 +95,12 @@ BBBM *bbbm_new(struct options *opts, const gchar *config,
     bbbm->thumbsdir = thumbsdir;
     bbbm->filename = NULL;
     bbbm->opts = opts;
+    bbbm->modified = FALSE;
     bbbm->images = NULL;
 
     bbbm->window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
     gtk_window_set_default_size(GTK_WINDOW(bbbm->window), 640, 480);
-    gtk_window_set_title(GTK_WINDOW(bbbm->window), CAPTION);
+    gtk_window_set_title(GTK_WINDOW(bbbm->window), "bbbm "VERSION);
     gtk_signal_connect(GTK_OBJECT(bbbm->window), "delete-event",
                        GTK_SIGNAL_FUNC(bbbm_exit_window), bbbm);
     vbox = gtk_vbox_new(FALSE, 0);
@@ -168,10 +171,10 @@ void bbbm_reorder(BBBM *bbbm, guint index)
     {
         guint c, r;
         gtk_container_remove(GTK_CONTAINER(bbbm->table),
-                             BBBM_WIDGET(iter->data));
+                             BBBM_IMAGE(iter->data)->box);
         c = i % bbbm->opts->thumb_cols;
         r = i / bbbm->opts->thumb_cols;
-        gtk_table_attach(GTK_TABLE(bbbm->table), BBBM_WIDGET(iter->data),
+        gtk_table_attach(GTK_TABLE(bbbm->table), BBBM_IMAGE(iter->data)->box,
                          c, c + 1, r, r + 1, 0, 0,
                          bbbm->padding, bbbm->padding);
     }
@@ -198,6 +201,33 @@ void bbbm_resize_thumbs(BBBM *bbbm)
     g_list_free(old_imgs);
 }
 
+void bbbm_set_modified(BBBM *bbbm, gboolean modified)
+{
+    if (bbbm->modified == modified)
+        return;
+    bbbm->modified = modified;
+    if (modified)
+    {
+        if (bbbm->filename)
+        {
+            guint context_id = gtk_statusbar_get_context_id(
+                            GTK_STATUSBAR(bbbm->file_statusbar), FILE_CONTEXT);
+            gchar *filename = g_strconcat(bbbm->filename, "*", NULL);
+            gtk_statusbar_push(GTK_STATUSBAR(bbbm->file_statusbar), context_id,
+                               filename);
+            g_free(filename);
+        }
+    }
+    else
+    {
+        guint context_id = gtk_statusbar_get_context_id(
+                            GTK_STATUSBAR(bbbm->file_statusbar), FILE_CONTEXT);
+        bbbm->modified = FALSE;
+        // popping empty statusbar is ok
+        gtk_statusbar_pop(GTK_STATUSBAR(bbbm->file_statusbar), context_id);
+    }
+}
+
 static gint bbbm_save_to(BBBM *bbbm, const gchar *file)
 {
     GList *iter;
@@ -208,6 +238,7 @@ static gint bbbm_save_to(BBBM *bbbm, const gchar *file)
         fprintf(f, "%s\n%s\n", BBBM_IMAGE(iter->data)->filename,
                                BBBM_IMAGE(iter->data)->description);
     fclose(f);
+    bbbm_set_modified(bbbm, FALSE);
     // change filename
     if (!bbbm->filename || strcmp(bbbm->filename, file))
     {
@@ -261,6 +292,41 @@ static gint bbbm_compare_description(gconstpointer image1,
 {
     return strcmp(BBBM_IMAGE(image1)->description,
                   BBBM_IMAGE(image2)->description);
+}
+
+static inline gboolean bbbm_can_close(BBBM *bbbm)
+{
+    if (bbbm->modified)
+    {
+        static const gchar *text = "Collection has been modified."
+                                   " Close anyway?";
+        gboolean result;
+        GtkWidget *dialog = gtk_message_dialog_new(GTK_WINDOW(bbbm->window), 0,
+                                                   GTK_MESSAGE_QUESTION,
+                                                   GTK_BUTTONS_YES_NO, text);
+        gtk_window_set_title(GTK_WINDOW(dialog), "Close collection?");
+        result = gtk_dialog_run(GTK_DIALOG(dialog)) == GTK_RESPONSE_YES;
+        gtk_widget_destroy(dialog);
+        return result;
+    }
+    return TRUE;
+}
+
+static inline void bbbm_close_collection(BBBM *bbbm)
+{
+    guint context_id = gtk_statusbar_get_context_id(
+                            GTK_STATUSBAR(bbbm->file_statusbar), FILE_CONTEXT);
+    while (bbbm->images)
+    {
+        BBBMImage* image = BBBM_IMAGE(bbbm->images->data);
+        bbbm->images = g_list_remove(bbbm->images, image);
+        bbbm_image_destroy(image);
+    }
+    g_free(bbbm->filename);
+    bbbm->filename = NULL;
+    bbbm_set_modified(bbbm, FALSE);
+    gtk_statusbar_pop(GTK_STATUSBAR(bbbm->file_statusbar), context_id);
+    bbbm_statusbar_clear(bbbm);
 }
 
 static inline gboolean bbbm_ask_overwrite(BBBM *bbbm, const gchar *file)
@@ -334,7 +400,7 @@ static inline void bbbm_execute(const gchar *command, gchar *file)
         cmd[i - 1] = g_strdup(file);
         execvp(cmd[0], cmd);
         g_strfreev(cmd);
-        fprintf(stderr, "bbbm: error executing '%s %s': %s\n",
+        fprintf(stderr, "bbbm: error executing '%s \"%s\"': %s\n",
                 command, file, g_strerror(errno));
         // the child process will try to get back to the window, exit instead
         exit(1);
@@ -380,23 +446,30 @@ static GtkWidget *bbbm_create_menu_bar(BBBM *bbbm)
     return gtk_item_factory_get_widget(item_factory, "<main>");
 }
 
-static void bbbm_set_status(GtkWidget *widget, GdkEvent *event,
-                            BBBMImage *image)
+static gboolean bbbm_set_status(GtkWidget *widget, GdkEvent *event,
+                                BBBMImage *image)
 {
     guint context_id = gtk_statusbar_get_context_id(
                    GTK_STATUSBAR(image->bbbm->image_statusbar), IMAGE_CONTEXT);
     gtk_statusbar_push(GTK_STATUSBAR(image->bbbm->image_statusbar), context_id,
                                      image->description);
+    return FALSE;
 }
 
-static void bbbm_clear_status(GtkWidget *widget, GdkEvent *event, BBBM *bbbm)
+static gboolean bbbm_clear_status(GtkWidget *widget, GdkEvent *event,
+                                  BBBM *bbbm)
 {
     bbbm_statusbar_clear(bbbm);
+    return FALSE;
 }
 
 static void bbbm_open(BBBM *bbbm)
 {
-    GtkWidget *chooser = create_chooser(bbbm, "Open a collection",
+    GtkWidget *chooser;
+
+    if (!bbbm_can_close(bbbm))
+        return;
+    chooser = create_chooser(bbbm, "Open a collection",
                                         FALSE, TRUE);
     while (gtk_dialog_run(GTK_DIALOG(chooser)) == GTK_RESPONSE_OK)
     {
@@ -428,11 +501,13 @@ static void bbbm_open_collection(BBBM *bbbm, const gchar *file)
     guint context_id = gtk_statusbar_get_context_id(
                             GTK_STATUSBAR(bbbm->file_statusbar), FILE_CONTEXT);
     // first close the current file, then set filename and add new
-    bbbm_close(bbbm);
+    bbbm_close_collection(bbbm);
     bbbm->filename = bbbm_util_absolute_path(file);
     gtk_statusbar_push(GTK_STATUSBAR(bbbm->file_statusbar), context_id,
                        bbbm->filename);
     bbbm_add_collection0(bbbm, file);
+    // add_collection0 will have set modified to TRUE and pushed, so pop
+    bbbm_set_modified(bbbm, FALSE);
 }
 
 static void bbbm_save(BBBM *bbbm)
@@ -454,27 +529,28 @@ static void bbbm_save(BBBM *bbbm)
 
 static void bbbm_close(BBBM *bbbm)
 {
-    GList *iter;
-    guint context_id = gtk_statusbar_get_context_id(
-                            GTK_STATUSBAR(bbbm->file_statusbar), FILE_CONTEXT);
-    for (iter = bbbm->images; iter; iter = iter->next)
-        bbbm_image_destroy(BBBM_IMAGE(iter->data));
-    g_list_free(bbbm->images);
-    bbbm->images = NULL;
-    g_free(bbbm->filename);
-    bbbm->filename = NULL;
-    gtk_statusbar_pop(GTK_STATUSBAR(bbbm->file_statusbar), context_id);
-    bbbm_statusbar_clear(bbbm);
+    if (!bbbm_can_close(bbbm))
+        return;
+    bbbm_close_collection(bbbm);
 }
 
-static void bbbm_exit_window(GtkWidget *widget, GdkEvent *event, BBBM *bbbm)
+static gboolean bbbm_exit_window(GtkWidget *widget, GdkEvent *event,
+                                 BBBM *bbbm)
 {
-    bbbm_exit(bbbm);
+    if (!bbbm_can_close(bbbm))
+        // block other handlers, like closing the window!
+        return TRUE;
+    bbbm_close_collection(bbbm);
+    gtk_widget_destroy(bbbm->window);
+    gtk_main_quit();
+    return FALSE;
 }
 
 static void bbbm_exit(BBBM *bbbm)
 {
-    bbbm_close(bbbm);
+    if (!bbbm_can_close(bbbm))
+        return;
+    bbbm_close_collection(bbbm);
     gtk_widget_destroy(bbbm->window);
     gtk_main_quit();
 }
@@ -544,21 +620,21 @@ static void bbbm_add_image0(BBBM *bbbm, gchar *filename, gchar *description,
         guint col, row;
         waitpid(pid, NULL, 0);
         image = bbbm_image_new(bbbm, filename, description, thumb);
-        gtk_signal_connect(GTK_OBJECT(BBBM_WIDGET(image)),
+        gtk_signal_connect(GTK_OBJECT(BBBM_IMAGE(image)->box),
                            "button-press-event", 
                            GTK_SIGNAL_FUNC(bbbm_set_image), image);
-        gtk_signal_connect(GTK_OBJECT(BBBM_WIDGET(image)),
+        gtk_signal_connect(GTK_OBJECT(BBBM_IMAGE(image)->box),
                            "button-release-event",
                            GTK_SIGNAL_FUNC(bbbm_popup), image);
-        gtk_signal_connect(GTK_OBJECT(BBBM_WIDGET(image)),
+        gtk_signal_connect(GTK_OBJECT(BBBM_IMAGE(image)->box),
                            "enter-notify-event",
                            GTK_SIGNAL_FUNC(bbbm_set_status), image);
-        gtk_signal_connect(GTK_OBJECT(BBBM_WIDGET(image)),
+        gtk_signal_connect(GTK_OBJECT(BBBM_IMAGE(image)->box),
                            "leave-notify-event",
                            GTK_SIGNAL_FUNC(bbbm_clear_status), image->bbbm);
-        gtk_widget_show(BBBM_WIDGET(image));
+        gtk_widget_show(BBBM_IMAGE(image)->box);
         // we might remove it from the table, so increase refcount
-        g_object_ref(BBBM_WIDGET(image));
+        g_object_ref(BBBM_IMAGE(image)->box);
         if (index == -1)
         {
             guint img_num = g_list_length(bbbm->images);
@@ -573,9 +649,10 @@ static void bbbm_add_image0(BBBM *bbbm, gchar *filename, gchar *description,
             bbbm->images = g_list_insert(bbbm->images, image, index);
             bbbm_reorder(bbbm, index + 1);
         }
-        gtk_table_attach(GTK_TABLE(bbbm->table), BBBM_WIDGET(image),
+        gtk_table_attach(GTK_TABLE(bbbm->table), BBBM_IMAGE(image)->box,
                          col, col + 1, row, row + 1, 0, 0, 
                          bbbm->padding, bbbm->padding);
+        bbbm_set_modified(bbbm, TRUE);
     }
     else
         bbbm_error_message(bbbm, "Could not create thumb");
@@ -762,16 +839,19 @@ static void bbbm_sort_images(BBBM *bbbm, gint field)
             return;
     }
     bbbm_reorder(bbbm, 0);
+    bbbm_set_modified(bbbm, TRUE);
 }
 
-static void bbbm_set_image(GtkWidget *widget, GdkEvent *event, BBBMImage *image)
+static gboolean bbbm_set_image(GtkWidget *widget, GdkEvent *event,
+                               BBBMImage *image)
 {
     if (event->type == GDK_2BUTTON_PRESS)
         bbbm_set(image);
+    return FALSE;
 }
 
-static void bbbm_popup(GtkWidget *widget, GdkEventButton *event,
-                       BBBMImage *image)
+static gboolean bbbm_popup(GtkWidget *widget, GdkEventButton *event,
+                           BBBMImage *image)
 {
     if (event->type == GDK_BUTTON_RELEASE && event->button == 3)
     {
@@ -805,6 +885,7 @@ static void bbbm_popup(GtkWidget *widget, GdkEventButton *event,
         gtk_menu_popup(GTK_MENU(popup), NULL, NULL, NULL, NULL,
                        event->button, event->time);
     }
+    return FALSE;
 }
 
 static void bbbm_set(BBBMImage *image)
@@ -820,11 +901,13 @@ static void bbbm_view(BBBMImage *image)
 static void bbbm_move_back(BBBMImage *image, gint index)
 {
     bbbm_move_dialog(image, index, FALSE);
+    bbbm_set_modified(image->bbbm, TRUE);
 }
 
 static void bbbm_move_forward(BBBMImage *image, gint index)
 {
     bbbm_move_dialog(image, index, TRUE);
+    bbbm_set_modified(image->bbbm, TRUE);
 }
 
 static void bbbm_insert(BBBMImage *image)
@@ -882,4 +965,5 @@ static void bbbm_delete(BBBMImage *image)
     if (index != g_list_length(bbbm->images))
         // dit not remove the last one
         bbbm_reorder(bbbm, index);
+    bbbm_set_modified(bbbm, TRUE);
 }

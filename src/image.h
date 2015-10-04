@@ -25,7 +25,6 @@
 #include "bbbm.h"
 
 #define BBBM_IMAGE(obj)         ((BBBMImage *)(obj))
-#define BBBM_WIDGET(obj)          (((BBBMImage *)(obj))->box)
 
 typedef struct
 {
