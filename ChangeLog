@@ -1,6 +1,11 @@
 bbbm ChangeLog
 ----------------------------------------
 
+0.4.2
+-----
+ - Added support for long filenames in the created Blackbox menu (i.e. with
+   spaces and characters \, (, ), { and })
+
 0.4.1
 -----
  - Zombie child processes are cleaned up now

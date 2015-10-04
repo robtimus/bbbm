@@ -21,7 +21,7 @@
 #ifndef __BBBM_H_
 #define __BBBM_H_
 
-#define VERSION         "0.4.1"
+#define VERSION         "0.4.2"
 #define BBBM_DIR        "/.bbbm"
 #define BBBM_CONFIG     "/bbbm.cfg"
 #define BBBM_THUMBS     "/thumbs"

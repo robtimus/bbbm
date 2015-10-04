@@ -46,6 +46,8 @@ typedef gint (*create_func)(BBBM *, const gchar *);
 static gint bbbm_save_to(BBBM *, const gchar *);
 static gint bbbm_create_list(BBBM *, const gchar *);
 static gint bbbm_create_menu(BBBM *, const gchar *);
+static inline void bbbm_create_menu_item(FILE *, const gchar *, const gchar *,
+                                         const gchar *);
 static gint bbbm_compare_filename(gconstpointer, gconstpointer);
 static gint bbbm_compare_description(gconstpointer, gconstpointer);
 
@@ -274,12 +276,63 @@ static gint bbbm_create_menu(BBBM *bbbm, const gchar *file)
         return 1;
     fprintf(f, "[submenu] (Backgrounds)\n");
     for (iter = bbbm->images; iter; iter = iter->next)
-        fprintf(f, "  [exec] (%s) {%s %s}\n",
-                BBBM_IMAGE(iter->data)->description,
-                bbbm->opts->set_command,
-                BBBM_IMAGE(iter->data)->filename);
+        bbbm_create_menu_item(f, bbbm->opts->set_command,
+                              BBBM_IMAGE(iter->data)->filename,
+                              BBBM_IMAGE(iter->data)->description);
     fclose(f);
     return 0;
+}
+
+static inline void bbbm_create_menu_item(FILE *file, const gchar *command,
+                                         const gchar *filename,
+                                         const gchar *description)
+{
+    fputs("  [exec] (", file);
+    while (*description)
+        switch (*description)
+        {
+            case '\\': // fallthrough
+            case '(': // fallthrough
+            case ')': // fallthrough
+            case '{': // fallthrough
+            case '}':
+                fputc('\\', file);
+                // fallthrough
+            default:
+                fputc(*description++, file);
+                break;
+        }
+    fputs(") {", file);
+    while (*command)
+        switch (*command)
+        {
+            case '\\': // fallthrough
+            case '(': // fallthrough
+            case ')': // fallthrough
+            case '{': // fallthrough
+            case '}':
+                fputc('\\', file);
+                // fallthrough
+            default:
+                fputc(*command++, file);
+                break;
+        }
+    fputs(" \"", file);
+    while (*filename)
+        switch (*filename)
+        {
+            case '\\': // fallthrough
+            case '(': // fallthrough
+            case ')': // fallthrough
+            case '{': // fallthrough
+            case '}':
+                fputc('\\', file);
+                // fallthrough
+            default:
+                fputc(*filename++, file);
+                break;
+        }
+    fputs("\"}\n", file);
 }
 
 static gint bbbm_compare_filename(gconstpointer image1, gconstpointer image2)
