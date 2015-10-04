@@ -93,19 +93,19 @@ void bbbm_options_dialog(BBBM *bbbm)
         const gchar *thumb_size;
         gint thumb_cols;
         if (strcmp((set_command = gtk_entry_get_text(GTK_ENTRY(set_entry))),
-                   bbbm->opts->set_command));
+                   bbbm->opts->set_command))
         {
             g_free(bbbm->opts->set_command);
             bbbm->opts->set_command = g_strdup(set_command);
         }
         if (strcmp((view_command = gtk_entry_get_text(GTK_ENTRY(view_entry))),
-                   bbbm->opts->view_command));
+                   bbbm->opts->view_command))
         {
             g_free(bbbm->opts->view_command);
             bbbm->opts->view_command = g_strdup(view_command);
         }
         if (strcmp((thumb_size = gtk_entry_get_text(GTK_ENTRY(size_entry))),
-                   bbbm->opts->thumb_size));
+                   bbbm->opts->thumb_size))
         {
             g_free(bbbm->opts->thumb_size);
             bbbm->opts->thumb_size = g_strdup(thumb_size);

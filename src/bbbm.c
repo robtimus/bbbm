@@ -36,6 +36,9 @@
 #define BBBM_LIST       2
 #define BBBM_MENU       3
 
+#define FILENAME_SORT           1
+#define DESCRIPTION_SORT        2
+
 #define FILE_CONTEXT    "Filename"
 #define IMAGE_CONTEXT   "Image"
 
@@ -43,6 +46,8 @@ typedef gint (*create_func)(BBBM *, const gchar *);
 static gint bbbm_save_to(BBBM *, const gchar *);
 static gint bbbm_create_list(BBBM *, const gchar *);
 static gint bbbm_create_menu(BBBM *, const gchar *);
+static gint bbbm_compare_filename(gconstpointer, gconstpointer);
+static gint bbbm_compare_description(gconstpointer, gconstpointer);
 
 static inline gboolean bbbm_ask_overwrite(BBBM *, const gchar *);
 static inline void bbbm_error_message(BBBM *, const gchar *);
@@ -65,9 +70,9 @@ static void bbbm_add_image0(BBBM *, gchar *, gchar *, gint);
 static void bbbm_add_directory(BBBM *);
 static void bbbm_add_collection(BBBM *);
 static void bbbm_add_collection0(BBBM *, const gchar *);
-
 static void bbbm_create(BBBM *, gint);
 static void bbbm_random_background(BBBM *);
+static void bbbm_sort_images(BBBM *, gint);
 static void bbbm_set_image(GtkWidget *, GdkEvent *, BBBMImage *);
 static void bbbm_popup(GtkWidget *, GdkEventButton *, BBBMImage *);
 static void bbbm_set(BBBMImage *);
@@ -246,6 +251,18 @@ static gint bbbm_create_menu(BBBM *bbbm, const gchar *file)
     return 0;
 }
 
+static gint bbbm_compare_filename(gconstpointer image1, gconstpointer image2)
+{
+    return strcmp(BBBM_IMAGE(image1)->filename, BBBM_IMAGE(image2)->filename);
+}
+
+static gint bbbm_compare_description(gconstpointer image1,
+                                     gconstpointer image2)
+{
+    return strcmp(BBBM_IMAGE(image1)->description,
+                  BBBM_IMAGE(image2)->description);
+}
+
 static inline gboolean bbbm_ask_overwrite(BBBM *bbbm, const gchar *file)
 {
     gboolean result;
@@ -326,7 +343,7 @@ static inline void bbbm_execute(const gchar *command, gchar *file)
 
 static GtkWidget *bbbm_create_menu_bar(BBBM *bbbm)
 {
-    static guint num_items = 19;
+    static guint num_items = 22;
     static GtkItemFactoryEntry menu_items[] =
     {
         {"/_File", NULL, NULL, 0, "<Branch>"},
@@ -340,6 +357,11 @@ static GtkWidget *bbbm_create_menu_bar(BBBM *bbbm)
         {"/Edit/_Add Image...", "<ctrl>A", bbbm_add_image, 0, NULL},
         {"/Edit/Add _Directory...", "<ctrl>D", bbbm_add_directory, 0, NULL},
         {"/Edit/Add _Collection...", "<ctrl>C", bbbm_add_collection, 0, NULL},
+        {"/Edit/sep", NULL, NULL, 0, "<Separator>"},
+        {"/Edit/Sort On _Filename", "<ctrl><shift>F",
+         bbbm_sort_images, FILENAME_SORT, NULL},
+        {"/Edit/Sort On D_escription", "<ctrl><shift>D",
+         bbbm_sort_images, DESCRIPTION_SORT, NULL},
         {"/_Tools", NULL, NULL, 0, "<Branch>"},
         {"/Tools/Create _List...", "<ctrl>L", bbbm_create, BBBM_LIST, NULL},
         {"/Tools/Create _Menu...", "<ctrl>M", bbbm_create, BBBM_MENU, NULL},
@@ -724,6 +746,22 @@ static void bbbm_random_background(BBBM *bbbm)
         bbbm_set(image);
         g_rand_free(rand);
     }
+}
+
+static void bbbm_sort_images(BBBM *bbbm, gint field)
+{
+    switch (field)
+    {
+        case FILENAME_SORT:
+            bbbm->images = g_list_sort(bbbm->images, bbbm_compare_filename);
+            break;
+        case DESCRIPTION_SORT:
+            bbbm->images = g_list_sort(bbbm->images, bbbm_compare_description);
+            break;
+        default:
+            return;
+    }
+    bbbm_reorder(bbbm, 0);
 }
 
 static void bbbm_set_image(GtkWidget *widget, GdkEvent *event, BBBMImage *image)
