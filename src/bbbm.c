@@ -1,6 +1,6 @@
 /*
  * bbbm - A background manager for Blackbox
- * Copyright (C) 2004 Rob Spoor
+ * Copyright (C) 2004-2007 Rob Spoor
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -33,6 +33,8 @@
 
 static gboolean bbbm_exit_window(GtkWidget *widget, GdkEvent *event,
                                  BBBM *bbbm);
+
+static void update_item_enabled_states(BBBM *bbbm);
 
 static void bbbm_open(BBBM *bbbm);
 static inline gboolean bbbm_open0(BBBM *bbbm, const gchar *filename);
@@ -131,6 +133,7 @@ BBBM *bbbm_new(struct options *opts, const gchar *config, const gchar *file)
          gtk_statusbar_get_context_id(GTK_STATUSBAR(bbbm->image_bar), "Image");
     gtk_widget_show_all(bbbm->window);
 
+    update_item_enabled_states(bbbm);
     if (file && !g_file_test(file, G_FILE_TEST_IS_REGULAR))
     {
         gchar *message = g_strconcat("Could not open '", file, "'", NULL);
@@ -164,6 +167,29 @@ static gboolean bbbm_exit_window(GtkWidget *widget, GdkEvent *event,
     return FALSE;
 }
 
+static void update_item_enabled_states(BBBM *bbbm)
+{
+    GtkWidget *widget;
+    gboolean file = (bbbm->filename != NULL);
+    gboolean images = (bbbm->images != NULL);
+    
+    widget = gtk_item_factory_get_item(bbbm->factory, "/File/Save");
+    gtk_widget_set_sensitive(widget, file);
+    widget = gtk_item_factory_get_item(bbbm->factory, "/File/Close");
+    gtk_widget_set_sensitive(widget, file || images);
+
+    widget = gtk_item_factory_get_item(bbbm->factory,
+                                       "/Edit/Sort On Filename");
+    gtk_widget_set_sensitive(widget, images);
+    widget = gtk_item_factory_get_item(bbbm->factory,
+                                       "/Edit/Sort On Description");
+    gtk_widget_set_sensitive(widget, images);
+
+    widget = gtk_item_factory_get_item(bbbm->factory,
+                                       "/Tools/Random Background");
+    gtk_widget_set_sensitive(widget, images);
+}
+
 static void bbbm_open(BBBM *bbbm)
 {
     gchar *filename;
@@ -189,6 +215,7 @@ static inline gboolean bbbm_open0(BBBM *bbbm, const gchar *filename)
         gtk_statusbar_pop(GTK_STATUSBAR(bbbm->file_bar), bbbm->file_cid);
         gtk_statusbar_push(GTK_STATUSBAR(bbbm->file_bar), bbbm->file_cid,
                            bbbm->filename);
+        update_item_enabled_states(bbbm);
         return TRUE;
     }
     else
@@ -243,6 +270,7 @@ static gboolean bbbm_save_as0(BBBM *bbbm, const gchar *filename)
         bbbm->filename = bbbm_util_absolute_path(filename);
         gtk_statusbar_push(GTK_STATUSBAR(bbbm->file_bar), bbbm->file_cid,
                            bbbm->filename);
+        update_item_enabled_states(bbbm);
     }
     return TRUE;
 }
@@ -267,6 +295,7 @@ static inline void bbbm_close0(BBBM *bbbm)
     gtk_statusbar_pop(GTK_STATUSBAR(bbbm->file_bar), bbbm->file_cid);
     gtk_statusbar_push(GTK_STATUSBAR(bbbm->file_bar), bbbm->file_cid,
                        "Untitled");
+    update_item_enabled_states(bbbm);
 }
 
 static void bbbm_exit(BBBM *bbbm)
@@ -331,6 +360,7 @@ static gboolean bbbm_add_image0(BBBM *bbbm, const gchar *filename,
     gtk_table_attach(GTK_TABLE(bbbm->table), image,
                      col, col + 1, row, row + 1, 0, 0, PADDING, PADDING);
     bbbm_set_modified(bbbm, TRUE);
+    update_item_enabled_states(bbbm);
     return TRUE;
 }
 
@@ -602,14 +632,14 @@ static inline GtkWidget *bbbm_create_menubar(BBBM *bbbm)
         {"/Tools/sep", NULL, NULL, 0, "<Separator>"},
         {"/Tools/_Options...", "<alt>P", bbbm_options, 0, NULL},
         {"/_Help", NULL, NULL, 0, "<Branch>"},
-        {"/Help/_About", NULL, bbbm_about, 0, NULL}
+        {"/Help/_About...", NULL, bbbm_about, 0, NULL}
     };
     GtkAccelGroup *accel_group = gtk_accel_group_new();
-    GtkItemFactory *factory = gtk_item_factory_new(GTK_TYPE_MENU_BAR, "<main>",
-                                                   accel_group);
-    gtk_item_factory_create_items(factory, n_items, items, bbbm);
+    bbbm->factory = gtk_item_factory_new(GTK_TYPE_MENU_BAR, "<main>", 
+                                         accel_group);
+    gtk_item_factory_create_items(bbbm->factory, n_items, items, bbbm);
     gtk_window_add_accel_group(GTK_WINDOW(bbbm->window), accel_group);
-    return gtk_item_factory_get_widget(factory, "<main>");
+    return gtk_item_factory_get_widget(bbbm->factory, "<main>");
 }
 
 static gboolean bbbm_can_close(BBBM *bbbm)
@@ -854,4 +884,6 @@ static void bbbm_delete(BBBMImage *image, guint index)
     if (index != g_list_length(bbbm->images))
         bbbm_reset_images(bbbm, index);
     bbbm_set_modified(bbbm, TRUE);
+    if (!bbbm->images)
+        update_item_enabled_states(bbbm);
 }

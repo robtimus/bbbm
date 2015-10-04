@@ -1,6 +1,6 @@
 /*
  * bbbm - A background manager for Blackbox
- * Copyright (C) 2004 Rob Spoor
+ * Copyright (C) 2004-2007 Rob Spoor
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -21,7 +21,7 @@
 #ifndef __BBBM_H_
 #define __BBBM_H_
 
-#define VERSION         "0.7.1"
+#define VERSION         "0.7.2"
 #define BBBM_DIR        "/.bbbm"
 #define BBBM_CONFIG     "/bbbm.cfg"
 #define BBBM_THUMBS     "/thumbs/"
@@ -43,6 +43,7 @@ typedef struct
     guint file_mod_cid;
     GtkWidget *image_bar;
     guint image_cid;
+    GtkItemFactory *factory;
 } BBBM;
 
 BBBM *bbbm_new(struct options *opts, const gchar *config, const gchar *file);

@@ -1,6 +1,13 @@
 bbbm ChangeLog
 ----------------------------------------
 
+0.7.2
+-----
+ - Improved layout of the options dialog a bit
+ - Useless menu items are now disabled, such as closing when no file is opened
+   or sorting when there are no images. Creating empty lists, menus or
+   collections is still allowed though
+
 0.7.1
 -----
  - Increased the default number of extra commands from 5 to 10. A scroll pane

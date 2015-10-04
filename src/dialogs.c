@@ -1,6 +1,6 @@
 /*
  * bbbm - A background manager for Blackbox
- * Copyright (C) 2004 Rob Spoor
+ * Copyright (C) 2004-2007 Rob Spoor
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -25,7 +25,9 @@
 #include "bbbm.h"
 #include "util.h"
 
-#define PADDING         5
+#define PADDING                 5
+#define OPTION_LABEL_ALIGN_X    1
+#define OPTION_LABEL_ALIGN_Y    0.5
 
 gboolean bbbm_dialogs_question(GtkWindow *parent, const gchar *title,
                                const gchar *message)
@@ -179,6 +181,7 @@ guint bbbm_dialogs_options(GtkWindow *parent, struct options *opts)
     GtkWidget *dialog, *notebook, *vbox, *frame, *table, *label, *set_entry,
               *view_entry, *hbox, *width_entry, *height_entry, *cols_entry,
               *label_check, *title_check, *scroll;
+    GtkSizeGroup *group;
     GtkWidget *commands[MAX_COMMANDS], *cmd_labels[MAX_COMMANDS];
     GtkObject *adj;
     guint i;
@@ -188,6 +191,7 @@ guint bbbm_dialogs_options(GtkWindow *parent, struct options *opts)
                                          GTK_STOCK_OK, GTK_RESPONSE_OK,
                                          GTK_STOCK_CANCEL, GTK_RESPONSE_CANCEL,
                                          NULL);
+    group = gtk_size_group_new(GTK_SIZE_GROUP_HORIZONTAL);
     notebook = gtk_notebook_new();
     vbox = gtk_vbox_new(FALSE, 0);
    
@@ -195,12 +199,18 @@ guint bbbm_dialogs_options(GtkWindow *parent, struct options *opts)
     gtk_container_set_border_width(GTK_CONTAINER(frame), PADDING);
     table = gtk_table_new(2, 2, FALSE);
     label = gtk_label_new("Set command:");
+    gtk_misc_set_alignment(GTK_MISC(label), OPTION_LABEL_ALIGN_X,
+                           OPTION_LABEL_ALIGN_Y);
+    gtk_size_group_add_widget(group, label);
     gtk_table_attach(GTK_TABLE(table), label, 0, 1, 0, 1, 0, 0, PADDING, 0);
     set_entry = gtk_entry_new();
     gtk_entry_set_text(GTK_ENTRY(set_entry), opts->set_cmd);
     gtk_table_attach(GTK_TABLE(table), set_entry, 1, 2, 0, 1,
                      GTK_EXPAND | GTK_FILL, 0, PADDING, 0);
     label = gtk_label_new("View command:");
+    gtk_misc_set_alignment(GTK_MISC(label), OPTION_LABEL_ALIGN_X,
+                           OPTION_LABEL_ALIGN_Y);
+    gtk_size_group_add_widget(group, label);
     gtk_table_attach(GTK_TABLE(table), label, 0, 1, 1, 2, 0, 0, PADDING, 0);
     view_entry = gtk_entry_new();
     gtk_entry_set_text(GTK_ENTRY(view_entry), opts->view_cmd);
@@ -213,6 +223,9 @@ guint bbbm_dialogs_options(GtkWindow *parent, struct options *opts)
     gtk_container_set_border_width(GTK_CONTAINER(frame), PADDING);
     table = gtk_table_new(2, 2, FALSE);
     label = gtk_label_new("Thumbnail size:");
+    gtk_misc_set_alignment(GTK_MISC(label), OPTION_LABEL_ALIGN_X,
+                           OPTION_LABEL_ALIGN_Y);
+    gtk_size_group_add_widget(group, label);
     gtk_table_attach(GTK_TABLE(table), label, 0, 1, 0, 1, 0, 0, PADDING, 0);
     hbox = gtk_hbox_new(FALSE, PADDING);
     gtk_table_attach(GTK_TABLE(table), hbox, 1, 2, 0, 1,
@@ -226,6 +239,9 @@ guint bbbm_dialogs_options(GtkWindow *parent, struct options *opts)
     height_entry = gtk_spin_button_new(GTK_ADJUSTMENT(adj), 1, 0);
     gtk_box_pack_start(GTK_BOX(hbox), height_entry, TRUE, TRUE, 0);
     label = gtk_label_new("Thumbnail columns:");
+    gtk_misc_set_alignment(GTK_MISC(label), OPTION_LABEL_ALIGN_X,
+                           OPTION_LABEL_ALIGN_Y);
+    gtk_size_group_add_widget(group, label);
     gtk_table_attach(GTK_TABLE(table), label, 0, 1, 1, 2, 0, 0, PADDING, 0);
     adj = gtk_adjustment_new(opts->thumb_cols, 1, MAX_COLS, 1, 1, 1);
     cols_entry = gtk_spin_button_new(GTK_ADJUSTMENT(adj), 1, 0);
@@ -394,7 +410,7 @@ guint bbbm_dialogs_options(GtkWindow *parent, struct options *opts)
 void bbbm_dialogs_about(GtkWindow *parent)
 {
     static const gchar *about = "bbbm "VERSION"\nWritten by Rob Spoor\n\n"
-                                "CopyRight 2004 Rob Spoor";
+                                "CopyRight (C) 2004-2007 Rob Spoor";
     GtkWidget *dialog = gtk_message_dialog_new(parent, 0, GTK_MESSAGE_INFO,
                                                GTK_BUTTONS_OK, about);
     gtk_window_set_title(GTK_WINDOW(dialog), "About");
