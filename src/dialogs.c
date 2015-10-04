@@ -213,13 +213,3 @@ void bbbm_edit_description_dialog(BBBMImage *image)
     }
     gtk_widget_destroy(dialog);
 }
-
-void bbbm_error_message_dialog(BBBM *bbbm, const gchar *message)
-{
-    GtkWidget *dialog = gtk_message_dialog_new(GTK_WINDOW(bbbm->window), 0,
-                                               GTK_MESSAGE_ERROR,
-                                               GTK_BUTTONS_OK, message);
-    gtk_window_set_title(GTK_WINDOW(dialog), "Error");
-    gtk_dialog_run(GTK_DIALOG(dialog));
-    gtk_widget_destroy(dialog);
-}

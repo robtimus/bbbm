@@ -24,6 +24,7 @@
 #include <gtk/gtk.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
+#include <errno.h>
 #include <unistd.h>
 #include "options.h"
 #include "image.h"
@@ -209,7 +210,7 @@ static gint bbbm_save_to(BBBM *bbbm, const gchar *file)
                             GTK_STATUSBAR(bbbm->file_statusbar), FILE_CONTEXT);
         gtk_statusbar_pop(GTK_STATUSBAR(bbbm->file_statusbar), context_id);
         g_free(bbbm->filename); // freeing NULL is ok
-        bbbm->filename = g_strdup(file);
+        bbbm->filename = bbbm_util_absolute_path(file);
         gtk_statusbar_push(GTK_STATUSBAR(bbbm->file_statusbar), context_id,
                            bbbm->filename);
     }
@@ -271,7 +272,7 @@ static inline void bbbm_error_message(BBBM *bbbm, const gchar *message)
 
 static inline gboolean bbbm_is_image(const gchar *file)
 {
-    const gchar *ext = extension(file);
+    const gchar *ext = bbbm_util_extension(file);
     guint i;
     if (!ext)
         // ext is NULL, so no extensions
@@ -311,8 +312,15 @@ static inline void bbbm_execute(const gchar *command, gchar *file)
         for (i = 0; cmd[i]; ++i)
             ;
         // cmd[i] == NULL, so cmd[i - 1] should be X
-        cmd[i - 1] = file;
+        g_free(cmd[i - 1]);
+        // keep a copy of file, since we will free it if an error occurs!
+        cmd[i - 1] = g_strdup(file);
         execvp(cmd[0], cmd);
+        g_strfreev(cmd);
+        fprintf(stderr, "bbbm: error executing '%s %s': %s\n",
+                command, file, g_strerror(errno));
+        // the child process will try to get back to the window, exit instead
+        exit(1);
     }
 }
 
@@ -370,28 +378,25 @@ static void bbbm_open(BBBM *bbbm)
                                         FALSE, TRUE);
     while (gtk_dialog_run(GTK_DIALOG(chooser)) == GTK_RESPONSE_OK)
     {
-        gchar file[PATH_MAX];
-        strncpy(file,
-                gtk_file_selection_get_filename(GTK_FILE_SELECTION(chooser)),
-                PATH_MAX);
-        file[PATH_MAX - 1] = 0;
+        gchar *file = bbbm_util_absolute_path(
+                 gtk_file_selection_get_filename(GTK_FILE_SELECTION(chooser)));
         if (g_file_test(file, G_FILE_TEST_IS_REGULAR))
         {
             bbbm_open_collection(bbbm, file);
+            g_free(file);
             break;
         }
         else
         {
-            gchar dir[PATH_MAX];
+            gchar *dir = NULL;
             if (g_file_test(file, G_FILE_TEST_IS_DIR))
-                g_stpcpy(g_stpcpy(dir, file), "/");
+                dir = g_strconcat(file, "/", NULL);
             else if (!g_file_test(file, G_FILE_TEST_EXISTS))
-            {
-                dirname(file, dir);
-                strcat(dir, "/");
-            }
+                dir = bbbm_util_dirname(file);
             gtk_file_selection_set_filename(GTK_FILE_SELECTION(chooser), dir);
+            g_free(dir);
         }
+        g_free(file);
     }
     gtk_widget_destroy(chooser);    
 }
@@ -402,7 +407,7 @@ static void bbbm_open_collection(BBBM *bbbm, const gchar *file)
                             GTK_STATUSBAR(bbbm->file_statusbar), FILE_CONTEXT);
     // first close the current file, then set filename and add new
     bbbm_close(bbbm);
-    bbbm->filename = g_strdup(file);
+    bbbm->filename = bbbm_util_absolute_path(file);
     gtk_statusbar_push(GTK_STATUSBAR(bbbm->file_statusbar), context_id,
                        bbbm->filename);
     bbbm_add_collection0(bbbm, file);
@@ -466,16 +471,14 @@ static void bbbm_add_image(BBBM *bbbm)
         {
             if (files && files[0])
             {
-                gchar dir[PATH_MAX];
+                gchar *dir = NULL;
                 if (g_file_test(files[0], G_FILE_TEST_IS_DIR))
-                    g_stpcpy(g_stpcpy(dir, files[0]), "/");
+                    dir = g_strconcat(files[0], "/", NULL);
                 else if (!g_file_test(files[0], G_FILE_TEST_EXISTS))
-                {
-                    dirname(files[0], dir);
-                    strcat(dir, "/");
-                }
+                    dir = bbbm_util_dirname(files[0]);
                 gtk_file_selection_set_filename(GTK_FILE_SELECTION(chooser),
                                                 dir);
+                g_free(dir);
             }
             g_strfreev(files);
             continue;
@@ -484,7 +487,11 @@ static void bbbm_add_image(BBBM *bbbm)
         {
             if (g_file_test(files[i], G_FILE_TEST_IS_REGULAR) &&
                 bbbm_is_image(files[i]))
-                bbbm_add_image0(bbbm, files[i], NULL, -1);
+            {
+                gchar *absfile = bbbm_util_absolute_path(files[i]);
+                bbbm_add_image0(bbbm, absfile, NULL, -1);
+                g_free(absfile);
+            }
         }
         g_strfreev(files);
         break;
@@ -495,15 +502,16 @@ static void bbbm_add_image(BBBM *bbbm)
 static void bbbm_add_image0(BBBM *bbbm, gchar *filename, gchar *description,
                             gint index)
 {
-    gchar thumb[PATH_MAX], thumb_dir[2 * PATH_MAX];
+    gchar *thumb, *thumb_dir;
     pid_t pid;
 
     if (!description)
         description = filename;
-    g_stpcpy(g_stpcpy(g_stpcpy(thumb, bbbm->thumbsdir), "/"), filename);
-    dirname(thumb, thumb_dir);
+    thumb = g_strconcat(bbbm->thumbsdir, "/", filename, NULL);
+    thumb_dir = g_path_get_dirname(thumb);
     // makedir will also create bbbm->thumbsdir if it didn't exist yet
-    makedirs(thumb_dir);
+    bbbm_util_makedirs(thumb_dir);
+    g_free(thumb_dir);
 
     if ((pid = fork()) == 0)
         execlp("convert", "convert", "-size", bbbm->opts->thumb_size,
@@ -548,9 +556,8 @@ static void bbbm_add_image0(BBBM *bbbm, gchar *filename, gchar *description,
                          bbbm->padding, bbbm->padding);
     }
     else
-    {
         bbbm_error_message(bbbm, "Could not create thumb");
-    }
+    g_free(thumb);
 }
 
 static void bbbm_add_directory(BBBM *bbbm)
@@ -558,34 +565,33 @@ static void bbbm_add_directory(BBBM *bbbm)
     GtkWidget *chooser = create_chooser(bbbm, "Add a directory", FALSE, TRUE);
     while (gtk_dialog_run(GTK_DIALOG(chooser)) == GTK_RESPONSE_OK)
     {
-        gchar file[PATH_MAX];
-        strncpy(file,
-                gtk_file_selection_get_filename(GTK_FILE_SELECTION(chooser)),
-                PATH_MAX);
-        file[PATH_MAX - 1] = 0;
+        gchar *file = bbbm_util_absolute_path(
+                 gtk_file_selection_get_filename(GTK_FILE_SELECTION(chooser)));
         if (!g_file_test(file, G_FILE_TEST_IS_DIR))
         {
-            gchar dir[PATH_MAX];
-            dirname(file, dir);
-            strcat(dir, "/");
+            gchar *dir = bbbm_util_dirname(file);
             gtk_file_selection_set_filename(GTK_FILE_SELECTION(chooser), dir);
+            g_free(dir);
+            g_free(file);
             continue;
         }
         if (g_file_test(file, G_FILE_TEST_EXISTS))
         {
-            GSList *iter;
-            GSList *files = listdir(file);
-            for (iter = files; iter; iter = iter->next)
+            // listdir already returns absolute files
+            GList *files = bbbm_util_listdir(file);
+            while (files)
             {
-                gchar *file = (gchar *)iter->data;
+                gchar *file = (gchar *)files->data;
+                files = g_list_remove(files, file);
                 if (bbbm_is_image(file))
                     bbbm_add_image0(bbbm, file, file, -1);
                 // the string is copied inside bbbm_add_image0, so free it
                 g_free(file);
             }
-            g_slist_free(files);
+            g_free(file);
             break;
         }
+        g_free(file);
     }
     gtk_widget_destroy(chooser);
 }
@@ -604,17 +610,16 @@ static void bbbm_add_collection(BBBM *bbbm)
         {
             if (files && files[0])
             {
-                gchar dir[PATH_MAX];
+                gchar *dir = NULL;
                 if (g_file_test(files[0], G_FILE_TEST_IS_DIR))
-                    g_stpcpy(g_stpcpy(dir, files[0]), "/");
+                    dir = g_strconcat(files[0], "/", NULL);
                 else if (!g_file_test(files[0], G_FILE_TEST_EXISTS))
-                {
-                    dirname(files[0], dir);
-                    strcat(dir, "/");
-                }
+                    dir = bbbm_util_dirname(files[0]);
                 gtk_file_selection_set_filename(GTK_FILE_SELECTION(chooser),
                                                 dir);
+                g_free(dir);
             }
+            g_strfreev(files);
             continue;
         }
         for (i = 0; files[i]; ++i)
@@ -674,11 +679,8 @@ static void bbbm_create(BBBM *bbbm, gint type)
     }
     while (gtk_dialog_run(GTK_DIALOG(chooser)) == GTK_RESPONSE_OK)
     {
-        gchar file[PATH_MAX];
-        strncpy(file,
-                gtk_file_selection_get_filename(GTK_FILE_SELECTION(chooser)),
-                PATH_MAX);
-        file[PATH_MAX - 1] = 0;
+        gchar *file = bbbm_util_absolute_path(
+                 gtk_file_selection_get_filename(GTK_FILE_SELECTION(chooser)));
         if (!g_file_test(file, G_FILE_TEST_EXISTS) ||
             (g_file_test(file, G_FILE_TEST_IS_REGULAR) &&
              bbbm_ask_overwrite(bbbm, file)))
@@ -691,21 +693,23 @@ static void bbbm_create(BBBM *bbbm, gint type)
                 g_free(message);
             }
             else
+            {
+                g_free(file);
                 break;
+            }
         }
         else
         {
             // is a dir or could not overwrite; set path
-            gchar dir[PATH_MAX];
+            gchar *dir;
             if (g_file_test(file, G_FILE_TEST_IS_DIR))
-                g_stpcpy(g_stpcpy(dir, file), "/");
+                dir = g_strconcat(file, "/", NULL);
             else
-            {
-                dirname(file, dir);
-                strcat(dir, "/");
-            }
+                dir = bbbm_util_dirname(file);
             gtk_file_selection_set_filename(GTK_FILE_SELECTION(chooser), dir);
+            g_free(dir);
         }
+        g_free(file);
     }
     gtk_widget_destroy(chooser);
 }
@@ -801,17 +805,16 @@ static void bbbm_insert(BBBMImage *image)
         {
             if (files && files[0])
             {
-                gchar dir[PATH_MAX];
+                gchar *dir = NULL;
                 if (g_file_test(files[0], G_FILE_TEST_IS_DIR))
-                    g_stpcpy(g_stpcpy(dir, files[0]), "/");
+                    dir = g_strconcat(files[0], "/", NULL);
                 else if (!g_file_test(files[0], G_FILE_TEST_EXISTS))
-                {
-                    dirname(files[0], dir);
-                    strcat(dir, "/");
-                }
+                    dir = bbbm_util_dirname(files[0]);
                 gtk_file_selection_set_filename(GTK_FILE_SELECTION(chooser),
                                                 dir);
+                g_free(dir);
             }
+            g_strfreev(files);
             continue;
         }
         index = g_list_index(image->bbbm->images, image);
@@ -819,7 +822,11 @@ static void bbbm_insert(BBBMImage *image)
         {
             if (g_file_test(files[i], G_FILE_TEST_IS_REGULAR) &&
                 bbbm_is_image(files[i]))
-                bbbm_add_image0(image->bbbm, files[i], NULL, index++);
+            {
+                gchar *absfile = bbbm_util_absolute_path(files[i]);
+                bbbm_add_image0(image->bbbm, absfile, NULL, index++);
+                g_free(absfile);
+            }
         }
         g_strfreev(files);
         break;

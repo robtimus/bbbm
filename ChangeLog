@@ -1,6 +1,14 @@
 bbbm ChangeLog
 ----------------------------------------
 
+0.3.2
+----
+ - Fixed a bug in the Makefile that did not remove /usr/local/bin/bbbm, but
+   tried to remove /usr/local/bbbm instead
+ - Fixed a bug that (might) let the program crash if executing the set or view
+   command would produce an error; the error is now printed to stderr
+ - Using absolute, normalized paths now (i.e. no more /../ or /./)
+
 0.3.1
 -----
  - Improved file manager behaviour; makes it easier to jump to directories just

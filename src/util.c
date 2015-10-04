@@ -18,13 +18,14 @@
  * Boston, MA 02111-1307, USA.
  */
 
+#include <stdio.h>
 #include <string.h>
 #include <glib.h>
 #include <sys/stat.h>
-#include <dirent.h>
+#include <unistd.h>
 #include "util.h"
 
-const gchar *extension(const gchar *file)
+const gchar *bbbm_util_extension(const gchar *file)
 {
     guint len = strlen(file);
     while (--len > 0 && file[len] != '.' && file[len] != '/')
@@ -34,60 +35,90 @@ const gchar *extension(const gchar *file)
     return (file[len] == '.' ? file + len : NULL);
 }
 
-void dirname(const gchar *file, gchar *dir)
+gchar *bbbm_util_dirname(const gchar *file)
 {
-    guint len = strlen(file);
-    while (--len > 0 && file[len] != '/')
-        ;
-    // len is either 0, or file[len] is /
-    // file up till len is the dirname
-    strncpy(dir, file, len);
-    dir[len] = 0;
+    gchar *dir = g_path_get_dirname(file);
+    gchar *dirname = g_strconcat(dir, "/", NULL);
+    g_free(dir);
+    return dirname;
 }
 
-gint makedirs(const gchar *dir)
+gint bbbm_util_makedirs(const gchar *dir)
 {
     if (!g_file_test(dir, G_FILE_TEST_EXISTS))
     {
-        guint len = strlen(dir);
-        gchar parent[PATH_MAX];
-        if (dir[len - 1] == '/')
-        {
-            // chop of the trailing / first without altering dir
-            gchar dir2[PATH_MAX];
-            strncpy(dir2, dir, len - 1);
-            dirname(dir2, parent);
-        }
-        else
-            dirname(dir, parent);
-        if (strcmp(parent, ""))
+        gchar *parent = g_path_get_dirname(dir);
+        if (strcmp(parent, "/"))
         {
             // there is a parent; create it if necessary
             gint rc;
-            if ((rc = makedirs(parent)))
+            if ((rc = bbbm_util_makedirs(parent)))
+            {
+                g_free(parent);
                 return rc;
+            }
         }
+        g_free(parent);
         // return the result of mkdir, which is 0 upon success
         return mkdir(dir, 0755);
     }
     return 0;
 }
 
-GSList *listdir(const gchar *dir)
+gchar *bbbm_util_absolute_path(const gchar *path)
 {
-    DIR *d;
-    struct dirent *entry;
-    GSList *files = NULL;
+    gchar *dir, *file, *abs, *current;
 
-    if (!(d = opendir(dir)))
+    dir = g_path_get_dirname(path);
+    file = g_path_get_basename(path);
+    if (path[strlen(path) - 1] == '/')
+    {
+        // dir and file will be the same! e.g. /usr/ leads to /usr and usr
+        gchar *dir2 = g_path_get_dirname(dir);
+        g_free(dir);
+        dir = dir2;
+    }
+    current = g_get_current_dir();
+    if (chdir(dir) == -1)
+    {
+        g_free(dir);
+        g_free(file);
+        g_free(current);
+        return g_strdup(path);
+    }
+    g_free(dir);
+    dir = g_get_current_dir();
+    abs = g_strjoin("/", dir, file, NULL);
+    chdir(current);
+    g_free(current);
+    g_free(dir);
+    g_free(file);
+    return abs;
+}
+
+GList *bbbm_util_listdir(const gchar *dir)
+{
+    GDir *d;
+    const gchar *entry;
+    GList *files = NULL;
+    GError *error = NULL;
+
+    if (!(d = g_dir_open(dir, 0, &error)))
+    {
+        fprintf(stderr, "bbbm: could not open dir '%s' for reading: %s\n",
+                dir, error->message);
+        g_error_free(error);
         // files is still NULL
         return files;
-    while ((entry = readdir(d)))
+    }
+    while ((entry = g_dir_read_name(d)))
     {
-        gchar *file = g_strconcat(dir, "/", entry->d_name, NULL);
+        gchar *file = g_strconcat(dir, "/", entry, NULL);
         if (g_file_test(file, G_FILE_TEST_IS_REGULAR))
         {
-            files = g_slist_append(files, file);
+            gchar *file2 = bbbm_util_absolute_path(file);
+            g_free(file);
+            files = g_list_append(files, file2);
         }
         else
         {
@@ -95,6 +126,6 @@ GSList *listdir(const gchar *dir)
             g_free(file);
         }
     }
-    closedir(d);
+    g_dir_close(d);
     return files;
 }

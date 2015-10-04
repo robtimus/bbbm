@@ -36,7 +36,4 @@ void bbbm_move_dialog(BBBMImage *image, gint index, gboolean forward);
 /* Shows the Edit description dialog for the given BBBM image. */
 void bbbm_edit_description_dialog(BBBMImage *image);
 
-/* Shows an error dialog with the given message. */
-void bbbm_error_message_dialog(BBBM *bbbm, const gchar *message);
-
 #endif /* __BBBM_DIALOG_H_ */
