@@ -178,7 +178,7 @@ guint bbbm_dialogs_options(GtkWindow *parent, struct options *opts)
     guint result = 0;
     GtkWidget *dialog, *notebook, *vbox, *frame, *table, *label, *set_entry,
               *view_entry, *hbox, *width_entry, *height_entry, *cols_entry,
-              *label_check, *title_check;
+              *label_check, *title_check, *scroll;
     GtkWidget *commands[MAX_COMMANDS], *cmd_labels[MAX_COMMANDS];
     GtkObject *adj;
     guint i;
@@ -273,9 +273,13 @@ guint bbbm_dialogs_options(GtkWindow *parent, struct options *opts)
         gtk_table_attach(GTK_TABLE(table), commands[i], 1, 2, i + 1, i + 2,
                          GTK_EXPAND | GTK_FILL, 0, PADDING, PADDING);
     }
+    scroll = gtk_scrolled_window_new(NULL, NULL);
+    gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(scroll),
+                                   GTK_POLICY_NEVER, GTK_POLICY_AUTOMATIC);
+    gtk_scrolled_window_add_with_viewport(GTK_SCROLLED_WINDOW(scroll), table);
 
     label = gtk_label_new("Commands");
-    gtk_notebook_append_page(GTK_NOTEBOOK(notebook), table, label);
+    gtk_notebook_append_page(GTK_NOTEBOOK(notebook), scroll, label);
 
     gtk_box_pack_start(GTK_BOX(GTK_DIALOG(dialog)->vbox), notebook,
                        FALSE, FALSE, 0);

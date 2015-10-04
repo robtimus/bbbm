@@ -32,7 +32,7 @@
 #define MAX_WIDTH       (gdk_screen_width())
 #define MAX_HEIGHT      (gdk_screen_height())
 #define MAX_COLS        10
-#define MAX_COMMANDS    5
+#define MAX_COMMANDS    10
 
 struct options
 {

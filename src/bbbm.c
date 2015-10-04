@@ -48,6 +48,8 @@ static gboolean bbbm_add_image0(BBBM *bbbm, const gchar *filename,
 static void bbbm_add_directory(BBBM *bbbm);
 static void bbbm_add_collection(BBBM *bbbm);
 static gboolean bbbm_add_collection0(BBBM *bbbm, const gchar *filename);
+static void bbbm_add_image_list(BBBM *bbbm);
+static gboolean bbbm_add_image_list0(BBBM *bbbm, const gchar *filename);
 static void bbbm_sort_filename(BBBM *bbbm);
 static void bbbm_sort_description(BBBM *bbbm);
 static void bbbm_create_list(BBBM *bbbm);
@@ -355,7 +357,7 @@ static void bbbm_add_directory(BBBM *bbbm)
 static void bbbm_add_collection(BBBM *bbbm)
 {
     GList *files = bbbm_dialogs_get_files(GTK_WINDOW(bbbm->window),
-                                              "Add collections");
+                                          "Add collections");
     while (files)
     {
         gchar *file = (gchar *)files->data;
@@ -387,7 +389,46 @@ static gboolean bbbm_add_collection0(BBBM *bbbm, const gchar *filename)
         else
             strcpy(desc, file);
         if (bbbm_util_is_image(file))
-            result = result && bbbm_add_image0(bbbm, file, desc, -1);
+            result = result & bbbm_add_image0(bbbm, file, desc, -1);
+        else
+            result = FALSE;
+    }
+    fclose(f);
+    return result;
+}
+
+static void bbbm_add_image_list(BBBM *bbbm)
+{
+    GList *files = bbbm_dialogs_get_files(GTK_WINDOW(bbbm->window),
+                                          "Add image lists");
+    while (files)
+    {
+        gchar *file = (gchar *)files->data;
+        files = g_list_remove(files, file);
+        if (!bbbm_add_image_list0(bbbm, file))
+        {
+            gchar *message = g_strconcat("Could not add image list '", file,
+                                         "' properly", NULL);
+            bbbm_dialogs_error(GTK_WINDOW(bbbm->window), message);
+            g_free(message);
+        }
+        g_free(file);
+    }
+}
+
+static gboolean bbbm_add_image_list0(BBBM *bbbm, const gchar *filename)
+{
+    gboolean result = TRUE;
+
+    gchar file[PATH_MAX];
+    FILE *f = fopen(filename, "r");
+    if (!f)
+        return FALSE;
+    while (fgets(file, PATH_MAX, f))
+    {
+        g_strstrip(file);
+        if (bbbm_util_is_image(file))
+            result = result & bbbm_add_image0(bbbm, file, file, -1);
         else
             result = FALSE;
     }
@@ -533,7 +574,7 @@ static void bbbm_about(BBBM *bbbm)
 
 static inline GtkWidget *bbbm_create_menubar(BBBM *bbbm)
 {
-    static guint n_items = 22;
+    static guint n_items = 23;
     static GtkItemFactoryEntry items[] =
     {
         {"/_File", NULL, NULL, 0, "<Branch>"},
@@ -547,6 +588,7 @@ static inline GtkWidget *bbbm_create_menubar(BBBM *bbbm)
         {"/Edit/_Add Images...", "<ctrl>A", bbbm_add_image, 0, NULL},
         {"/Edit/Add _Directory...", "<ctrl>D", bbbm_add_directory, 0, NULL},
         {"/Edit/Add _Collections...", "<ctrl>C", bbbm_add_collection, 0, NULL},
+        {"/Edit/Add _Image List...", "<ctrl>I", bbbm_add_image_list, 0, NULL},
         {"/Edit/sep", NULL, NULL, 0, "<Separator>"},
         {"/Edit/Sort On _Filename", "<ctrl><shift>F",
          bbbm_sort_filename, 0, NULL},

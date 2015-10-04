@@ -47,7 +47,30 @@ gchar *bbbm_util_get_command(const gchar *command, const gchar *filename)
 {
     // FIXME: I still want %1 replacement, which can be put in here
     // For now, return the command with the filename appended between ""
-    return g_strconcat(command, " \"", filename, "\"", NULL);
+
+    gchar *start, *end;
+    start = (gchar *)command;
+    end = strstr(start, "%1");
+
+    if (end)
+    {
+        GString *result = g_string_sized_new(1024);
+        while (end)
+        {
+            while (start != end)
+                result = g_string_append_c(result, *start++);
+            result = g_string_append(result, filename);
+            start += 2;
+            end = strstr(start, "%1");
+        }
+        // copy the rest
+        while (*start)
+            result = g_string_append_c(result, *start++);
+        return g_string_free(result, FALSE);
+    }
+    else
+        // no %1 in the command, so add the filename to the end
+        return g_strconcat(command, " \"", filename, "\"", NULL);
 }
 
 void bbbm_util_execute(const gchar *command, const gchar *filename)

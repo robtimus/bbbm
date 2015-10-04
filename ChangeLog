@@ -1,6 +1,16 @@
 bbbm ChangeLog
 ----------------------------------------
 
+0.7.1
+-----
+ - Increased the default number of extra commands from 5 to 10. A scroll pane
+   makes sure the layout is kept intact, no matter the number of commands
+ - Added "Add Image List..." to Edit menu, which adds all supported images in
+   a text file. This file should have one image file per line
+ - Improved command handling. Each %1 inside the command will be replaced by
+   the image filename. If there is no %1, the image filename will be appended
+   to the command as before
+
 0.7
 ---
  - Added multiple commands that can be executed for an image
