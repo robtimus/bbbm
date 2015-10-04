@@ -268,13 +268,13 @@ guint bbbm_dialogs_options(GtkWindow *parent, struct options *opts)
         if (strcmp(set_cmd, opts->set_cmd))
         {
             g_free(opts->set_cmd);
-            set_cmd = g_strdup(set_cmd);
+            opts->set_cmd = g_strdup(set_cmd);
             result |= OPTIONS_SET_CMD_CHANGED;
         }
         if (strcmp(view_cmd, opts->view_cmd))
         {
             g_free(opts->view_cmd);
-            set_cmd = g_strdup(view_cmd);
+            opts->view_cmd = g_strdup(view_cmd);
             result |= OPTIONS_VIEW_CMD_CHANGED;
         }
         if (thumb_width != opts->thumb_width ||

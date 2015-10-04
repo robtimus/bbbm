@@ -1,6 +1,11 @@
 bbbm ChangeLog
 ----------------------------------------
 
+0.6.2
+-----
+ - Fixed a bug that caused the Set and View options to be messed up when they
+   were modified (with thanks to Kevin Tomasek)
+
 0.6.1
 -----
  - Fixed a bug that caused bbbm to crash when trying to open or add an
