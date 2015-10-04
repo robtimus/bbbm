@@ -1,6 +1,10 @@
 bbbm ChangeLog
 ----------------------------------------
 
+0.7
+---
+ - Added multiple commands that can be executed for an image
+
 0.6.2
 -----
  - Fixed a bug that caused the Set and View options to be messed up when they

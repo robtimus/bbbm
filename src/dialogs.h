@@ -33,7 +33,8 @@ enum
     OPTIONS_THUMB_SIZE_CHANGED = 4,
     OPTIONS_THUMB_COLS_CHANGED = 8,
     OPTIONS_FILENAME_LABEL_CHANGED = 16,
-    OPTIONS_FILENAME_TITLE_CHANGED = 32
+    OPTIONS_FILENAME_TITLE_CHANGED = 32,
+    OPTIONS_COMMAND_CHANGED = 64
 };
 
 gboolean bbbm_dialogs_question(GtkWindow *parent, const gchar *title,

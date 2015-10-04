@@ -25,7 +25,11 @@
 
 gboolean bbbm_util_is_image(const gchar *filename);
 
+gchar *bbbm_util_get_command(const gchar *command, const gchar *filename);
+
 void bbbm_util_execute(const gchar *command, const gchar *filename);
+
+void bbbm_util_execute_cmd(const gchar *command);
 
 gchar *bbbm_util_dirname(const gchar *filename);
 

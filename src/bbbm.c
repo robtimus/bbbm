@@ -74,6 +74,7 @@ static gboolean bbbm_set_status(GtkWidget *widget, GdkEventCrossing *event,
 static gboolean bbbm_clear_status(GtkWidget *widget, GdkEventCrossing *event,
                                   BBBMImage *image);
 
+static void bbbm_cmd_exec(GtkWidget *widget, gchar *command);
 static void bbbm_set(BBBMImage *image);
 static void bbbm_view(BBBMImage *image);
 static void bbbm_move_back(BBBMImage *image, guint index);
@@ -641,6 +642,8 @@ static gboolean bbbm_popup(GtkWidget *widget, GdkEventButton *event,
     if (event->type == GDK_BUTTON_RELEASE && event->button == 3)
     {
         GtkWidget *popup;
+        GtkWidget *item;
+        guint i;
         gint index = g_list_index(image->bbbm->images, image);
         static guint n_items = 9;
         GtkItemFactoryEntry items[] =
@@ -665,6 +668,33 @@ static gboolean bbbm_popup(GtkWidget *widget, GdkEventButton *event,
         if (index == g_list_length(image->bbbm->images) - 1)
             gtk_widget_set_sensitive(
                 gtk_item_factory_get_item(factory, "/Move Forward..."), FALSE);
+        // Add the commands
+        index = 3; 
+        for (i = 0; i < MAX_COMMANDS; i++)
+        {
+            struct options *opts = image->bbbm->opts;
+            if (opts->commands[i])
+            {
+                gchar *cmd;
+                gchar *label = opts->cmd_labels[i];
+                if (!label)
+                    label = opts->commands[i];
+                item = gtk_menu_item_new_with_label(label);
+                // potential memory leak, do not forget to free later!
+                cmd = bbbm_util_get_command(opts->commands[i], image->filename);
+                g_signal_connect(G_OBJECT(item), "activate",
+                                 G_CALLBACK(bbbm_cmd_exec), cmd);
+                gtk_menu_insert(GTK_MENU(popup), item, index);
+                index++;
+            }
+        }
+        if (index > 3)
+        {
+            // added at least one command
+            item = gtk_separator_menu_item_new();
+            gtk_menu_insert(GTK_MENU(popup), item, index);
+        }
+        gtk_widget_show_all(popup);
         gtk_menu_popup(GTK_MENU(popup), NULL, NULL, NULL, NULL,
                        event->button, event->time);
     }
@@ -688,6 +718,11 @@ static gboolean bbbm_clear_status(GtkWidget *widget, GdkEventCrossing *event,
     gtk_statusbar_pop(GTK_STATUSBAR(image->bbbm->image_bar),
                       image->bbbm->image_cid);
     return FALSE;
+}
+
+static void bbbm_cmd_exec(GtkWidget *widget, gchar *command)
+{
+    bbbm_util_execute_cmd(command);
 }
 
 static void bbbm_set(BBBMImage *image)

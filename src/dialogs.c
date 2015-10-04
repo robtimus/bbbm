@@ -176,16 +176,21 @@ void bbbm_dialogs_save(GtkWindow *parent, const gchar *title,
 guint bbbm_dialogs_options(GtkWindow *parent, struct options *opts)
 {
     guint result = 0;
-    GtkWidget *dialog, *frame, *table, *label, *set_entry, *view_entry,
-              *hbox, *width_entry, *height_entry, *cols_entry,
+    GtkWidget *dialog, *notebook, *vbox, *frame, *table, *label, *set_entry,
+              *view_entry, *hbox, *width_entry, *height_entry, *cols_entry,
               *label_check, *title_check;
+    GtkWidget *commands[MAX_COMMANDS], *cmd_labels[MAX_COMMANDS];
     GtkObject *adj;
+    guint i;
 
     dialog = gtk_dialog_new_with_buttons("Options", parent,
                                          GTK_DIALOG_NO_SEPARATOR,
                                          GTK_STOCK_OK, GTK_RESPONSE_OK,
                                          GTK_STOCK_CANCEL, GTK_RESPONSE_CANCEL,
                                          NULL);
+    notebook = gtk_notebook_new();
+    vbox = gtk_vbox_new(FALSE, 0);
+   
     frame = gtk_frame_new("Commands");
     gtk_container_set_border_width(GTK_CONTAINER(frame), PADDING);
     table = gtk_table_new(2, 2, FALSE);
@@ -202,9 +207,7 @@ guint bbbm_dialogs_options(GtkWindow *parent, struct options *opts)
     gtk_table_attach(GTK_TABLE(table), view_entry, 1, 2, 1, 2,
                      GTK_EXPAND | GTK_FILL, 0, PADDING, PADDING);
     gtk_container_add(GTK_CONTAINER(frame), table);
-    gtk_widget_show_all(frame);
-    gtk_box_pack_start(GTK_BOX(GTK_DIALOG(dialog)->vbox), frame,
-                       FALSE, FALSE, 0);
+    gtk_box_pack_start(GTK_BOX(vbox), frame, FALSE, FALSE, 0);
 
     frame = gtk_frame_new("Thumbnails");
     gtk_container_set_border_width(GTK_CONTAINER(frame), PADDING);
@@ -229,9 +232,7 @@ guint bbbm_dialogs_options(GtkWindow *parent, struct options *opts)
     gtk_table_attach(GTK_TABLE(table), cols_entry, 1, 2, 1, 2,
                      GTK_EXPAND | GTK_FILL, 0, PADDING, PADDING);
     gtk_container_add(GTK_CONTAINER(frame), table);
-    gtk_widget_show_all(frame);
-    gtk_box_pack_start(GTK_BOX(GTK_DIALOG(dialog)->vbox), frame,
-                       FALSE, FALSE, 0);
+    gtk_box_pack_start(GTK_BOX(vbox), frame, FALSE, FALSE, 0);
  
     frame = gtk_frame_new("Menu options");
     gtk_container_set_border_width(GTK_CONTAINER(frame), PADDING);
@@ -247,10 +248,39 @@ guint bbbm_dialogs_options(GtkWindow *parent, struct options *opts)
     gtk_table_attach(GTK_TABLE(table), title_check, 0, 1, 1, 2,
                      GTK_EXPAND | GTK_FILL, 0, PADDING, 0);
     gtk_container_add(GTK_CONTAINER(frame), table);
-    gtk_widget_show_all(frame);
-    gtk_box_pack_start(GTK_BOX(GTK_DIALOG(dialog)->vbox), frame,
-                       FALSE, FALSE, 0);
+    gtk_box_pack_start(GTK_BOX(vbox), frame, FALSE, FALSE, 0);
 
+    label = gtk_label_new("General");
+    gtk_notebook_append_page(GTK_NOTEBOOK(notebook), vbox, label);
+
+    table = gtk_table_new(MAX_COMMANDS + 1, 2, FALSE);
+    label = gtk_label_new("Label");
+    gtk_table_attach(GTK_TABLE(table), label, 0, 1, 0, 1,
+                     GTK_EXPAND | GTK_FILL, 0, PADDING, 0);
+    label = gtk_label_new("Command");
+    gtk_table_attach(GTK_TABLE(table), label, 1, 2, 0, 1,
+                     GTK_EXPAND | GTK_FILL, 0, PADDING, 0);
+    for (i = 0; i < MAX_COMMANDS; i++)
+    {
+        cmd_labels[i] = gtk_entry_new();
+        if (opts->cmd_labels[i])
+            gtk_entry_set_text(GTK_ENTRY(cmd_labels[i]), opts->cmd_labels[i]);
+        gtk_table_attach(GTK_TABLE(table), cmd_labels[i], 0, 1, i + 1, i + 2,
+                         GTK_EXPAND | GTK_FILL, 0, PADDING, PADDING);
+        commands[i] = gtk_entry_new();
+        if (opts->commands[i])
+            gtk_entry_set_text(GTK_ENTRY(commands[i]), opts->commands[i]);
+        gtk_table_attach(GTK_TABLE(table), commands[i], 1, 2, i + 1, i + 2,
+                         GTK_EXPAND | GTK_FILL, 0, PADDING, PADDING);
+    }
+
+    label = gtk_label_new("Commands");
+    gtk_notebook_append_page(GTK_NOTEBOOK(notebook), table, label);
+
+    gtk_box_pack_start(GTK_BOX(GTK_DIALOG(dialog)->vbox), notebook,
+                       FALSE, FALSE, 0);
+    gtk_widget_show_all(dialog);
+    
     if (gtk_dialog_run(GTK_DIALOG(dialog)) == GTK_RESPONSE_OK)
     {
         const gchar *set_cmd = gtk_entry_get_text(GTK_ENTRY(set_entry));
@@ -265,6 +295,14 @@ guint bbbm_dialogs_options(GtkWindow *parent, struct options *opts)
                   gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(label_check));
         gboolean filename_title =
                   gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(title_check));
+        const gchar *cmds[MAX_COMMANDS];
+        const gchar *labels[MAX_COMMANDS];
+        for (i = 0; i < MAX_COMMANDS; i++)
+        {
+            labels[i] = gtk_entry_get_text(GTK_ENTRY(cmd_labels[i]));
+            cmds[i] = gtk_entry_get_text(GTK_ENTRY(commands[i]));
+        }
+
         if (strcmp(set_cmd, opts->set_cmd))
         {
             g_free(opts->set_cmd);
@@ -298,6 +336,51 @@ guint bbbm_dialogs_options(GtkWindow *parent, struct options *opts)
         {
             opts->filename_title = filename_title;
             result |= OPTIONS_FILENAME_TITLE_CHANGED;
+        }
+        for (i = 0; i < MAX_COMMANDS; i++)
+        {
+            if (opts->cmd_labels[i])
+            {
+                if (strcmp(labels[i], opts->cmd_labels[i]))
+                {
+                    g_free(opts->cmd_labels[i]);
+                    // store if filled in, or make NULL otherwise
+                    if (strlen(labels[i]) > 0)
+                        opts->cmd_labels[i] = g_strdup(labels[i]);
+                    else
+                        opts->cmd_labels[i] = NULL;
+                    result |= OPTIONS_COMMAND_CHANGED;
+                }
+                // else the same, don't do anything
+            }
+            else if (strlen(labels[i]) > 0)
+            {
+                // was NULL, will be something now
+                opts->cmd_labels[i] = g_strdup(labels[i]);
+                result |= OPTIONS_COMMAND_CHANGED;
+            }
+            // else opts->cmd_labels[i] == NULL and labels[i] is empty, ignore
+            if (opts->commands[i])
+            {
+                if (strcmp(cmds[i], opts->commands[i]))
+                {
+                    g_free(opts->commands[i]);
+                    // store if filled in, or make NULL otherwise
+                    if (strlen(cmds[i]) > 0)
+                        opts->commands[i] = g_strdup(cmds[i]);
+                    else
+                        opts->commands[i] = NULL;
+                    result |= OPTIONS_COMMAND_CHANGED;
+                }
+                // else the same, don't do anything
+            }
+            else if (strlen(cmds[i]) > 0)
+            {
+                // was NULL, will be something now
+                opts->commands[i] = g_strdup(cmds[i]);
+                result |= OPTIONS_COMMAND_CHANGED;
+            }
+            // else opts->commands[i] == NULL and cmds[i] is empty, ignore
         }
     }
     gtk_widget_destroy(dialog);

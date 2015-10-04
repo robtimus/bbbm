@@ -46,6 +46,7 @@ void bbbm_options_destroy(struct options *opts)
 
 gint bbbm_options_write(struct options *opts, const gchar *filename)
 {
+    guint i;
     FILE *file = fopen(filename, "w");
     if (!file)
     {
@@ -64,11 +65,19 @@ gint bbbm_options_write(struct options *opts, const gchar *filename)
             (opts->filename_label ? "TRUE" : "FALSE"));
     fprintf(file, "filename_title = %s\n",
             (opts->filename_title ? "TRUE" : "FALSE"));
+    for (i = 0; i < MAX_COMMANDS; i++)
+    {
+        if (opts->commands[i])
+            fprintf(file, "command%d = %s\n", i, opts->commands[i]);
+        if (opts->cmd_labels[i])
+            fprintf(file, "cmd_label%d = %s\n", i, opts->cmd_labels[i]);
+    }
     return fclose(file);
 }
 
 struct options *bbbm_options_read(const gchar *filename)
 {
+    guint i;
     struct options *opts = NULL;
     gchar *thumb_size = NULL;
     gchar *thumb_cols = NULL;
@@ -278,6 +287,51 @@ struct options *bbbm_options_read(const gchar *filename)
             g_free(optval);
             continue;
         }
+        for (i = 0; i < MAX_COMMANDS; i++)
+        {
+            gchar label[20];
+            snprintf(label, 19, "command%d", i);
+            if (!strcmp(optval[0], label))
+            {
+                if (opts->commands[i])
+                {
+                    // ignore the new one
+                    g_strfreev(optval);
+                }
+                else
+                {
+                    opts->commands[i] = optval[1];
+                    g_free(optval[0]);
+                    g_free(optval);
+                }
+                // I so hate goto, but C does not allow to continue the outer
+                // loop without them...
+                goto iteration_end;
+            }
+            snprintf(label, 19, "cmd_label%d", i);
+            if (!strcmp(optval[0], label))
+            {
+                if (opts->cmd_labels[i])
+                {
+                    // ignore the new one
+                    g_strfreev(optval);
+                }
+                else
+                {
+                    opts->cmd_labels[i] = optval[1];
+                    g_free(optval[0]);
+                    g_free(optval);
+                }
+                // I so hate goto, but C does not allow to continue the outer
+                // loop without them...
+                goto iteration_end;
+            }
+        }
+        // still here, so nothing freed yet. Free the entire array now
+        g_strfreev(optval);
+iteration_end:
+        // don't need to do a thing, but some versions of GCC need a statement
+        i = 0;
     }
     if (fclose(file))
         fprintf(stderr, "bbbm: could not close '%s': %s\n",

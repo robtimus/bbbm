@@ -32,6 +32,7 @@
 #define MAX_WIDTH       (gdk_screen_width())
 #define MAX_HEIGHT      (gdk_screen_height())
 #define MAX_COLS        10
+#define MAX_COMMANDS    5
 
 struct options
 {
@@ -42,6 +43,8 @@ struct options
     gint thumb_cols;
     gboolean filename_label;
     gboolean filename_title;
+    gchar *commands[MAX_COMMANDS];
+    gchar *cmd_labels[MAX_COMMANDS];
 };
 
 struct options *bbbm_options_new();

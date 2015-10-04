@@ -43,28 +43,42 @@ gboolean bbbm_util_is_image(const gchar *filename)
     return FALSE;
 }
 
+gchar *bbbm_util_get_command(const gchar *command, const gchar *filename)
+{
+    // FIXME: I still want %1 replacement, which can be put in here
+    // For now, return the command with the filename appended between ""
+    return g_strconcat(command, " \"", filename, "\"", NULL);
+}
+
 void bbbm_util_execute(const gchar *command, const gchar *filename)
 {
+    gchar *cmd = bbbm_util_get_command(command, filename);
+    bbbm_util_execute_cmd(cmd);
+    g_free(cmd);
+}
+
+void bbbm_util_execute_cmd(const gchar *command)
+{
     pid_t pid;
-    if (!command || !filename || !strcmp(command, ""))
+    if (!command || !strcmp(command, ""))
+    {
         return;
+    }
     if (!(pid = fork()))
     {
-        gchar *cmd = g_strconcat(command, " \"", filename, "\"", NULL);
         gint ret;
         /* use system instead of exec* for less strict commands */
-        if ((ret = system(cmd)) == -1)
-            fprintf(stderr, "bbbm: could not execute '%s': %s\n",
-                    cmd, g_strerror(errno));
-        /* cmd prints its own error */
-        g_free(cmd);
-        /* the child process will try to get back to the window */
-        exit(WEXITSTATUS(ret));
+       if ((ret = system(command)) == -1)
+       {
+           fprintf(stderr, "bbbm: could not execute '%s': %s\n",
+                   command, g_strerror(errno));
+       }
+       exit(WEXITSTATUS(ret));
     }
     else if (pid == -1)
     {
-        fprintf(stderr, "bbbm: could not execute '%s \"%s\"': %s\n",
-                command, filename, g_strerror(errno));
+        fprintf(stderr, "bbbm: could not execute '%s': %s\n",
+                command, g_strerror(errno));
     }
 }
 
