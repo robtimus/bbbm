@@ -10,11 +10,7 @@ backgrounds, or a Blackbox background submenu.
 
 What are the sytem requirements ?
 ----------------------------------------
-o Python. bbbm is created with Python 2.2+, but should work on Python 1.6 and
-  higher.
-o PyGTK2. bbbm is created with PyGTK2 2.0.0, but should work with any PyGTK2
-  version IN THEORY.
-o GTK2. The version is dependant of the PyGTK2 version.
+o GTK2 (plus development package).
 o ImageMagick for creating the thumbnails.
 
 Although the name would suggest that Blackbox is needed, any command to set the
@@ -23,8 +19,9 @@ changed as well.
 
 How to compile/install ?
 ----------------------------------------
-just copy the bbbm file to a directory in the PATH variable, or to any other
-directory of choice.
+Go to the src directory and type 'make'.
+Next, as root, type 'make install' to copy the bbbm executable to
+/usr/local/bin, or copy it to a directory of choice manually.
 
 How to contact the author (me):
 ----------------------------------------

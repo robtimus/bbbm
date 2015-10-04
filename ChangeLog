@@ -1,13 +1,32 @@
 bbbm ChangeLog
 ----------------------------------------
 
+0.3
+---
+ - Complete rewrite in C (which should make bbbm1 redundant)
+ - No longer center bbbm by default, but let the window manager decide
+ - Fixed a bug that changed the current filename if a collection was added
+ - When changing the thumb size, the current thumbs are finally resized
+ - Introduced less strict config file parsing; whitespace is no longer an issue
+ - Added "Add Directory..." to Edit menu, which adds all supported images in
+   the selected directory
+ - Added "Move Back..." and "Move Forward..." to image popup menu
+ - "Insert..." can now insert multiple images
+ - Added support for commands with spaces in them
+ - Added an overwrite check when writing to a file
+ - No longer exits a file chooser when nothing is done; the only way to close
+   it now is either pressing Cancel, or successfully select a file / directory
+ - Extended the statusbar to show the filename of the currently opened
+   collection as well
+ - Changed accelerator for "Add Collection" to CTRL+C
+
 0.2
 ---
  - Fixed a bug in the configuration file reading
  - Introduced more error checking; no checking on file permissions though
  - Set scrollbar policy to automatic
  - Added inserting functionality
- - Changed accelerator for Close to CTRL+X
+ - Changed accelerator for "Close" to CTRL+X
 
 0.1
 ---
