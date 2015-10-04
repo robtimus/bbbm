@@ -1,6 +1,6 @@
 /*
  * bbbm - A background manager for Blackbox
- * Copyright (C) 2004-2007 Rob Spoor
+ * Copyright (C) 2004-2015 Rob Spoor
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -21,7 +21,7 @@
 #ifndef __BBBM_H_
 #define __BBBM_H_
 
-#define VERSION         "0.7.2"
+#define VERSION         "0.7.3"
 #define BBBM_DIR        "/.bbbm"
 #define BBBM_CONFIG     "/bbbm.cfg"
 #define BBBM_THUMBS     "/thumbs/"

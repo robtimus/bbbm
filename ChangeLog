@@ -1,6 +1,12 @@
 bbbm ChangeLog
 ----------------------------------------
 
+0.7.3
+-----
+ - Fixed the command in created Blackbox menus if the set command contains %1
+ - Fixed Makefile to work on newer systems
+ - Removed some compiler warnings
+
 0.7.2
 -----
  - Improved layout of the options dialog a bit

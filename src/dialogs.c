@@ -1,6 +1,6 @@
 /*
  * bbbm - A background manager for Blackbox
- * Copyright (C) 2004-2007 Rob Spoor
+ * Copyright (C) 2004-2015 Rob Spoor
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -34,7 +34,7 @@ gboolean bbbm_dialogs_question(GtkWindow *parent, const gchar *title,
 {
     gboolean result;
     GtkWidget *dialog = gtk_message_dialog_new(parent, 0, GTK_MESSAGE_QUESTION,
-                                               GTK_BUTTONS_YES_NO, message);
+                                               GTK_BUTTONS_YES_NO, "%s", message);
     gtk_window_set_title(GTK_WINDOW(dialog), title);
     gtk_window_set_resizable(GTK_WINDOW(dialog), FALSE);
     result = gtk_dialog_run(GTK_DIALOG(dialog)) == GTK_RESPONSE_YES;
@@ -45,7 +45,7 @@ gboolean bbbm_dialogs_question(GtkWindow *parent, const gchar *title,
 void bbbm_dialogs_error(GtkWindow *parent, const gchar *message)
 {
     GtkWidget *dialog = gtk_message_dialog_new(parent, 0, GTK_MESSAGE_ERROR,
-                                               GTK_BUTTONS_OK, message);
+                                               GTK_BUTTONS_OK, "%s", message);
     gtk_window_set_title(GTK_WINDOW(dialog), "Error");
     gtk_dialog_run(GTK_DIALOG(dialog));
     gtk_widget_destroy(dialog);
@@ -410,9 +410,9 @@ guint bbbm_dialogs_options(GtkWindow *parent, struct options *opts)
 void bbbm_dialogs_about(GtkWindow *parent)
 {
     static const gchar *about = "bbbm "VERSION"\nWritten by Rob Spoor\n\n"
-                                "CopyRight (C) 2004-2007 Rob Spoor";
+                                "CopyRight (C) 2004-2015 Rob Spoor";
     GtkWidget *dialog = gtk_message_dialog_new(parent, 0, GTK_MESSAGE_INFO,
-                                               GTK_BUTTONS_OK, about);
+                                               GTK_BUTTONS_OK, "%s", about);
     gtk_window_set_title(GTK_WINDOW(dialog), "About");
     gtk_dialog_run(GTK_DIALOG(dialog));
     gtk_widget_destroy(dialog);

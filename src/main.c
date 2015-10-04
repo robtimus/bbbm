@@ -1,6 +1,6 @@
 /*
  * bbbm - A background manager for Blackbox
- * Copyright (C) 2004-2007 Rob Spoor
+ * Copyright (C) 2004-2015 Rob Spoor
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -70,7 +70,7 @@ int main(int argc, char *argv[])
                 printf("bbbm %s\n", VERSION);
                 printf("Written by Rob Spoor\n");
                 printf("\n");
-                printf("CopyRight (C) 2004-2007 Rob Spoor\n");
+                printf("CopyRight (C) 2004-2015 Rob Spoor\n");
                 return 0;
             default:
                 fprintf(stderr, "Try `bbbm --help` for more information.\n");

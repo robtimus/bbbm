@@ -1,6 +1,6 @@
 /*
  * bbbm - A background manager for Blackbox
- * Copyright (C) 2004-2007 Rob Spoor
+ * Copyright (C) 2004-2015 Rob Spoor
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -121,11 +121,17 @@ gchar *bbbm_util_absolute_path(const gchar *path)
         gchar *dir;
         if (chdir(path) == -1)
         {
+           fprintf(stderr, "bbbm: could not change directory to '%s': %s\n",
+                   path, g_strerror(errno));
             g_free(current);
             return g_strdup(path);
         }
         dir = g_get_current_dir();
-        chdir(current);
+	if (chdir(current) == -1)
+        {
+           fprintf(stderr, "bbbm: could not change directory to '%s': %s\n",
+                   current, g_strerror(errno));
+        }
         g_free(current);
         return dir;
     }
@@ -136,6 +142,8 @@ gchar *bbbm_util_absolute_path(const gchar *path)
         gchar *file, *abs;
         if (chdir(dir) == -1)
         {
+           fprintf(stderr, "bbbm: could not change directory to '%s': %s\n",
+                   dir, g_strerror(errno));
             g_free(current);
             g_free(dir);
             return g_strdup(path);
@@ -144,7 +152,11 @@ gchar *bbbm_util_absolute_path(const gchar *path)
         dir = g_get_current_dir();
         file = g_path_get_basename(path);
         abs = g_strjoin("/", dir, file, NULL);
-        chdir(current);
+        if (chdir(current) == -1)
+        {
+           fprintf(stderr, "bbbm: could not change directory to '%s': %s\n",
+                   current, g_strerror(errno));
+        }
         g_free(current);
         g_free(dir);
         g_free(file);

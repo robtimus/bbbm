@@ -1,6 +1,6 @@
 /*
  * bbbm - A background manager for Blackbox
- * Copyright (C) 2004-2007 Rob Spoor
+ * Copyright (C) 2004-2015 Rob Spoor
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -542,15 +542,15 @@ static gboolean bbbm_create_menu0(BBBM *bbbm, const gchar *filename)
         fprintf(file, "Backgrounds)\n");
     for (iter = bbbm->images; iter; iter = iter->next)
     {
+	gchar *cmd = bbbm_util_get_command(bbbm->opts->set_cmd,
+                                           bbbm_image_get_filename(BBBM_IMAGE(iter->data)));
         fprintf(file, "  [exec] (");
         bbbm_write_string(file,
                           bbbm_image_get_description(BBBM_IMAGE(iter->data)));
         fprintf(file, ") {");
-        bbbm_write_string(file, bbbm->opts->set_cmd);
-        fprintf(file, " \"");
-        bbbm_write_string(file,
-                          bbbm_image_get_filename(BBBM_IMAGE(iter->data)));
-        fprintf(file, "\"}\n");
+        bbbm_write_string(file, cmd);
+        fprintf(file, "}\n");
+        g_free(cmd);
     }
     fclose(file);
     return TRUE;
