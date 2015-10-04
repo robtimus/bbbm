@@ -1,6 +1,11 @@
 bbbm ChangeLog
 ----------------------------------------
 
+0.6
+---
+ - Changed creation of images; instead of using external ImageMagick command,
+   gdk-pixbuf is used
+
 0.5
 ---
  - Rewrote great parts for greater readability

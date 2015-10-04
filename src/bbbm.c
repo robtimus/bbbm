@@ -82,14 +82,12 @@ static void bbbm_edit(BBBMImage *image);
 static void bbbm_insert(BBBMImage *image, guint index);
 static void bbbm_delete(BBBMImage *image, guint index);
 
-BBBM *bbbm_new(struct options *opts, const gchar *config,
-               const gchar *thumbdir, const gchar *file)
+BBBM *bbbm_new(struct options *opts, const gchar *config, const gchar *file)
 {
     GtkWidget *vbox, *hbox, *menubar, *scroll;
     BBBM *bbbm = g_malloc(sizeof(BBBM));
     bbbm->opts = opts;
     bbbm->config = config;
-    bbbm->thumbdir = thumbdir;
     bbbm->filename = NULL;
     bbbm->modified = FALSE;
     bbbm->images = NULL;
@@ -137,7 +135,11 @@ BBBM *bbbm_new(struct options *opts, const gchar *config,
         g_free(message);
     }
     else if (file)
-        bbbm_open0(bbbm, file);
+    {
+        gchar *absfile = bbbm_util_absolute_path(file);
+        bbbm_open0(bbbm, absfile);
+        g_free(absfile);
+    }
     return bbbm;
 }
 
@@ -180,7 +182,7 @@ static inline gboolean bbbm_open0(BBBM *bbbm, const gchar *filename)
     if (bbbm_add_collection0(bbbm, filename))
     {
         bbbm_set_modified(bbbm, FALSE);
-        bbbm->filename = bbbm_util_absolute_path(filename);
+        bbbm->filename = g_strdup(filename);
         gtk_statusbar_pop(GTK_STATUSBAR(bbbm->file_bar), bbbm->file_cid);
         gtk_statusbar_push(GTK_STATUSBAR(bbbm->file_bar), bbbm->file_cid,
                            bbbm->filename);
@@ -252,9 +254,9 @@ static inline void bbbm_close0(BBBM *bbbm)
 {
     while (bbbm->images)
     {
-        BBBMImage *image = BBBM_IMAGE(bbbm->images->data);
+        GtkWidget *image = GTK_WIDGET(bbbm->images->data);
         bbbm->images = g_list_remove(bbbm->images, image);
-        bbbm_image_destroy(image);
+        gtk_widget_destroy(image);
     }
     g_free(bbbm->filename);
     bbbm->filename = NULL;
@@ -292,47 +294,23 @@ static void bbbm_add_image(BBBM *bbbm)
 static gboolean bbbm_add_image0(BBBM *bbbm, const gchar *filename,
                                 const gchar *description, gint index)
 {
-    gchar *thumb, *thumbdir, *command;
-    BBBMImage *image;
+    GtkWidget *image;
     guint col, row;
 
     if (!description)
         description = filename;
-    thumb = g_strconcat(bbbm->thumbdir, "/", filename, NULL);
-    thumbdir = g_path_get_dirname(thumb);
-    if (bbbm_util_makedirs(thumbdir))
-    {
-        fprintf(stderr, "bbbm: could not create directory '%s': %s\n",
-                thumbdir, g_strerror(errno));
-        g_free(thumbdir);
-        g_free(thumb);
-        return FALSE;
-    }
-    g_free(thumbdir);
-
-    command = g_strconcat("convert -size ", bbbm->opts->thumb_size,
-                          " -resize ", bbbm->opts->thumb_size, " \"", filename,
-                          "\" \"", thumb, "\"", NULL);
-    if (system(command))
-    {
-        g_free(thumb);
-        g_free(command);
-        return FALSE;
-    }
-    g_free(command);
-
-    image = bbbm_image_new(bbbm, filename, description, thumb);
-    g_free(thumb);
-    g_signal_connect(G_OBJECT(image->box), "button-press-event",
+    image = bbbm_image_new(bbbm, filename, description,
+                           bbbm->opts->thumb_width, bbbm->opts->thumb_height);
+    g_signal_connect(G_OBJECT(image), "button-press-event",
                      G_CALLBACK(bbbm_set_image), image);
-    g_signal_connect(G_OBJECT(image->box), "button-release-event",
+    g_signal_connect(G_OBJECT(image), "button-release-event",
                      G_CALLBACK(bbbm_popup), image);
-    g_signal_connect(G_OBJECT(image->box), "enter-notify-event",
+    g_signal_connect(G_OBJECT(image), "enter-notify-event",
                      G_CALLBACK(bbbm_set_status), image);
-    g_signal_connect(G_OBJECT(image->box), "leave-notify-event",
+    g_signal_connect(G_OBJECT(image), "leave-notify-event",
                      G_CALLBACK(bbbm_clear_status), image);
-    gtk_widget_show(image->box);
-    g_object_ref(image->box);
+    gtk_widget_show(image);
+    g_object_ref(image);
     if (index == -1)
     {
         guint img_num = g_list_length(bbbm->images);
@@ -347,7 +325,7 @@ static gboolean bbbm_add_image0(BBBM *bbbm, const gchar *filename,
         bbbm->images = g_list_insert(bbbm->images, image, index);
         bbbm_reset_images(bbbm, index + 1);
     }
-    gtk_table_attach(GTK_TABLE(bbbm->table), image->box,
+    gtk_table_attach(GTK_TABLE(bbbm->table), image,
                      col, col + 1, row, row + 1, 0, 0, PADDING, PADDING);
     bbbm_set_modified(bbbm, TRUE);
     return TRUE;
@@ -633,8 +611,8 @@ static void bbbm_reset_images(BBBM *bbbm, guint index)
         guint c = index % num_cols;
         guint r = index / num_cols;
         gtk_container_remove(GTK_CONTAINER(bbbm->table),
-                             BBBM_IMAGE(iter->data)->box);
-        gtk_table_attach(GTK_TABLE(bbbm->table), BBBM_IMAGE(iter->data)->box,
+                             GTK_WIDGET(iter->data));
+        gtk_table_attach(GTK_TABLE(bbbm->table), GTK_WIDGET(iter->data),
                          c, c + 1, r, r + 1, 0, 0, PADDING, PADDING);
     }
     gtk_table_resize(GTK_TABLE(bbbm->table), MAX(rows, 1), MAX(cols, 1));
@@ -642,18 +620,10 @@ static void bbbm_reset_images(BBBM *bbbm, guint index)
 
 static void bbbm_resize_thumbs(BBBM *bbbm)
 {
-    gboolean was_modified = bbbm->modified;
-    GList *old = bbbm->images;
-    bbbm->images = NULL;
-    while (old)
-    {
-        BBBMImage *image = BBBM_IMAGE(old->data);
-        old = g_list_remove(old, image);
-        bbbm_add_image0(bbbm, bbbm_image_get_filename(image),
-                        bbbm_image_get_description(image), -1);
-        bbbm_image_destroy(image);
-    }
-    bbbm_set_modified(bbbm, was_modified);
+    GList *iter;
+    for (iter = bbbm->images; iter; iter = iter->next)
+        bbbm_image_resize(BBBM_IMAGE(iter->data), bbbm->opts->thumb_width,
+                          bbbm->opts->thumb_height);
 }
 
 static gboolean bbbm_set_image(GtkWidget *widget, GdkEventButton *event,
@@ -770,8 +740,7 @@ static void bbbm_edit(BBBMImage *image)
     {
         /* normally we would call bbbm_image_set_description.
            However, why do duplicate new_desc only to free it? */
-        g_free(image->description);
-        image->description = new_desc;
+        bbbm_image_set_description_ref(image, new_desc);
         bbbm_set_modified(image->bbbm, TRUE);
     }
     else if (new_desc)
@@ -804,7 +773,7 @@ static void bbbm_delete(BBBMImage *image, guint index)
 {
     BBBM *bbbm = image->bbbm;
     bbbm->images = g_list_remove(bbbm->images, image);
-    bbbm_image_destroy(image);
+    gtk_widget_destroy(GTK_WIDGET(image));
     if (index != g_list_length(bbbm->images))
         bbbm_reset_images(bbbm, index);
     bbbm_set_modified(bbbm, TRUE);

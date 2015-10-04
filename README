@@ -11,7 +11,7 @@ backgrounds, or a Blackbox background submenu.
 What are the sytem requirements ?
 ----------------------------------------
 o GTK2 (plus development package).
-o ImageMagick for creating the thumbnails.
+o GCC and pkgconfig for compiling.
 
 Although the name would suggest that Blackbox is needed, any command to set the
 background can be used. GQView is the default image viewer, but this can be

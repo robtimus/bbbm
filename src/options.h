@@ -25,7 +25,6 @@
 
 #define SET_COMMAND     "bsetbg"
 #define VIEW_COMMAND    "gqview"
-#define THUMB_SIZE      "128x96"
 #define THUMB_WIDTH     128
 #define THUMB_HEIGHT    96
 #define THUMB_COLS      4
@@ -38,9 +37,6 @@ struct options
 {
     gchar *set_cmd;
     gchar *view_cmd;
-    /* adding images will happen more frequently than changing size;
-       store size string */
-    gchar *thumb_size;
     gint thumb_width;
     gint thumb_height;
     gint thumb_cols;

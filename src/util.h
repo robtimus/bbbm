@@ -27,14 +27,10 @@ gboolean bbbm_util_is_image(const gchar *filename);
 
 void bbbm_util_execute(const gchar *command, const gchar *filename);
 
-gint bbbm_util_makedirs(const gchar *dir);
-
 gchar *bbbm_util_dirname(const gchar *filename);
 
 gchar *bbbm_util_absolute_path(const gchar *path);
 
 GList *bbbm_util_listdir(const gchar *dir);
-
-gchar *bbbm_util_get_size_str(gint width, gint height);
 
 #endif /* __BBBM_UTIL_H_ */

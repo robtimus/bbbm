@@ -282,9 +282,6 @@ guint bbbm_dialogs_options(GtkWindow *parent, struct options *opts)
         {
             opts->thumb_width = thumb_width;
             opts->thumb_height = thumb_height;
-            g_free(opts->thumb_size);
-            opts->thumb_size = bbbm_util_get_size_str(opts->thumb_width,
-                                                      opts->thumb_height);
             result |= OPTIONS_THUMB_SIZE_CHANGED;
         }
         if (thumb_cols != opts->thumb_cols)

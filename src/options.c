@@ -31,7 +31,6 @@ struct options *bbbm_options_new()
     struct options *opts = g_malloc(sizeof(struct options));
     opts->set_cmd = g_strdup(SET_COMMAND);
     opts->view_cmd = g_strdup(VIEW_COMMAND);
-    opts->thumb_size = g_strdup(THUMB_SIZE);
     opts->thumb_width = THUMB_WIDTH;
     opts->thumb_height = THUMB_HEIGHT;
     opts->thumb_cols = THUMB_COLS;
@@ -42,7 +41,6 @@ void bbbm_options_destroy(struct options *opts)
 {
     g_free(opts->set_cmd);
     g_free(opts->view_cmd);
-    g_free(opts->thumb_size);
     g_free(opts);
 }
 
@@ -72,6 +70,7 @@ gint bbbm_options_write(struct options *opts, const gchar *filename)
 struct options *bbbm_options_read(const gchar *filename)
 {
     struct options *opts = NULL;
+    gchar *thumb_size = NULL;
     gchar *thumb_cols = NULL;
     gchar *filename_label = NULL;
     gchar *filename_title = NULL;
@@ -136,18 +135,20 @@ struct options *bbbm_options_read(const gchar *filename)
         }
         if (!strcmp(optval[0], "thumb_size"))
         {
-            if (!opts->thumb_size)
+            if (!thumb_size)
             {
                 gchar *mid, *end;
-                opts->thumb_size = optval[1];
-                opts->thumb_width = strtod(opts->thumb_size, &mid);
-                if (*mid != 'x' || mid == opts->thumb_size)
+                thumb_size = optval[1];
+                opts->thumb_width = strtod(thumb_size, &mid);
+                if (*mid != 'x' || mid == thumb_size)
                 {
                     fprintf(stderr, "bbbm: illegal value of option '%s' on "
                             "line %d: %s\n", optval[0], lineno, optval[1]);
                     fclose(file);
-                    g_free(optval[0]);
-                    g_free(optval);
+                    g_strfreev(optval);
+                    g_free(thumb_cols);
+                    g_free(filename_label);
+                    g_free(filename_title);
                     bbbm_options_destroy(opts);
                     return NULL;
                 }
@@ -159,8 +160,10 @@ struct options *bbbm_options_read(const gchar *filename)
                     fprintf(stderr, "bbbm: illegal value of option '%s' on "
                             "line %d: %s\n", optval[0], lineno, optval[1]);
                     fclose(file);
-                    g_free(optval[0]);
-                    g_free(optval);
+                    g_strfreev(optval);
+                    g_free(thumb_cols);
+                    g_free(filename_label);
+                    g_free(filename_title);
                     bbbm_options_destroy(opts);
                     return NULL;
                 }
@@ -169,8 +172,7 @@ struct options *bbbm_options_read(const gchar *filename)
             {
                 fprintf(stderr, "bbbm: duplicate value of option '%s' on line"
                         " %d of '%s': %s. Using first value %s\n",
-                        optval[0], lineno, filename, optval[1],
-                        opts->thumb_size);
+                        optval[0], lineno, filename, optval[1], thumb_size);
                 g_free(optval[1]);
             }
             g_free(optval[0]);
@@ -190,6 +192,7 @@ struct options *bbbm_options_read(const gchar *filename)
                             "line %d: %s\n", optval[0], lineno, optval[1]);
                     fclose(file);
                     g_strfreev(optval);
+                    g_free(thumb_size);
                     g_free(filename_label);
                     g_free(filename_title);
                     bbbm_options_destroy(opts);
@@ -222,6 +225,7 @@ struct options *bbbm_options_read(const gchar *filename)
                             "line %d: %s\n", optval[0], lineno, optval[1]);
                     fclose(file);
                     g_strfreev(optval);
+                    g_free(thumb_size);
                     g_free(thumb_cols);
                     g_free(filename_title);
                     bbbm_options_destroy(opts);
@@ -256,6 +260,7 @@ struct options *bbbm_options_read(const gchar *filename)
                     fclose(file);
                     g_strfreev(optval);
                     g_free(filename_label);
+                    g_free(thumb_size);
                     g_free(thumb_cols);
                     bbbm_options_destroy(opts);
                     return NULL;
@@ -289,48 +294,37 @@ struct options *bbbm_options_read(const gchar *filename)
                 "Using default value '%s'\n", VIEW_COMMAND);
         opts->view_cmd = g_strdup(VIEW_COMMAND);
     }
-    if (!opts->thumb_size)
+    if (!thumb_size)
     {
         fprintf(stderr, "bbbm: option 'thumb_size' missing. "
-                "Using default value '%s'\n", THUMB_SIZE);
-        opts->thumb_size = g_strdup(THUMB_SIZE);
+                "Using default value '%dx%d'\n", THUMB_WIDTH, THUMB_HEIGHT);
         opts->thumb_width = THUMB_WIDTH;
         opts->thumb_height = THUMB_HEIGHT;
     }
     else
     {
-        gboolean changed = FALSE;
+        g_free(thumb_size);
         if (opts->thumb_width <= 0)
         {
             fprintf(stderr, "bbbm: thumb width <= 0. Using value 1\n");
             opts->thumb_width = 1;
-            changed = TRUE;
         }
         else if (opts->thumb_width > MAX_WIDTH)
         {
             fprintf(stderr, "bbbm: thumb width > %d. Using value %d\n",
                     MAX_WIDTH, MAX_WIDTH);
             opts->thumb_width = MAX_WIDTH;
-            changed = TRUE;
         }
         if (opts->thumb_height <= 0)
         {
             fprintf(stderr, "bbbm: thumb height <= 0. Using value 1\n");
             opts->thumb_height = 1;
-            changed = TRUE;
         }
         else if (opts->thumb_height > MAX_HEIGHT)
         {
             fprintf(stderr, "bbbm: thumb height > %d. Using value %d\n",
                     MAX_HEIGHT, MAX_HEIGHT);
             opts->thumb_height = MAX_HEIGHT;
-            changed = TRUE;
-        }
-        if (changed)
-        {
-            g_free(opts->thumb_size);
-            opts->thumb_size = bbbm_util_get_size_str(opts->thumb_width,
-                                                      opts->thumb_height);
         }
     }
     if (!thumb_cols)

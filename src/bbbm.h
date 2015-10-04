@@ -21,7 +21,7 @@
 #ifndef __BBBM_H_
 #define __BBBM_H_
 
-#define VERSION         "0.5"
+#define VERSION         "0.6"
 #define BBBM_DIR        "/.bbbm"
 #define BBBM_CONFIG     "/bbbm.cfg"
 #define BBBM_THUMBS     "/thumbs/"
@@ -33,7 +33,6 @@ typedef struct
 {
     struct options *opts;
     const gchar *config;
-    const gchar *thumbdir;
     gchar *filename;
     gboolean modified;
     GList *images;
@@ -46,8 +45,7 @@ typedef struct
     guint image_cid;
 } BBBM;
 
-BBBM *bbbm_new(struct options *opts, const gchar *config,
-               const gchar *thumbdir, const gchar *file);
+BBBM *bbbm_new(struct options *opts, const gchar *config, const gchar *file);
 
 void bbbm_destroy(BBBM *bbbm);
 

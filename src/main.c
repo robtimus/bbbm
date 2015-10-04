@@ -44,7 +44,7 @@ int main(int argc, char *argv[])
     };
     static const gchar *short_opts = "hv";
     gint c;
-    gchar *homedir, *config, *thumbdir;
+    gchar *homedir, *config;
     struct options *opts;
     BBBM *bbbm;
 
@@ -89,6 +89,7 @@ int main(int argc, char *argv[])
         }
     }
     config = g_strconcat(homedir, BBBM_CONFIG, NULL);
+    g_free(homedir);
     if (!g_file_test(config, G_FILE_TEST_EXISTS))
     {
         opts = bbbm_options_new();
@@ -99,15 +100,11 @@ int main(int argc, char *argv[])
     else if (!(opts = bbbm_options_read(config)))
     {
         /* bbbm_options_read printed the error */
-        g_free(homedir);
         g_free(config);
         return 1;
     }
     /* else file exists and read successfully */
-    thumbdir = g_strconcat(homedir, BBBM_THUMBS, NULL);
-    g_free(homedir);
-    bbbm = bbbm_new(opts, config, thumbdir,
-                    (optind < argc ? argv[optind] : NULL));
+    bbbm = bbbm_new(opts, config, (optind < argc ? argv[optind] : NULL));
 
     gtk_main();
     bbbm_destroy(bbbm);
@@ -116,14 +113,5 @@ int main(int argc, char *argv[])
     /* do not exit */
     bbbm_options_destroy(opts);
     g_free(config);
-    if (g_file_test(thumbdir, G_FILE_TEST_IS_DIR))
-    {
-        gchar *command = g_strconcat("rm -rf ", thumbdir, "/*", NULL);
-        if (system(command) == -1)
-            fprintf(stderr, "bbbm: could not remove thumbs in '%s': %s\n",
-                    thumbdir, g_strerror(errno));
-        g_free(command);
-    }
-    g_free(thumbdir);
     return 0;
 }

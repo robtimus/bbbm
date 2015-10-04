@@ -68,29 +68,6 @@ void bbbm_util_execute(const gchar *command, const gchar *filename)
     }
 }
 
-gint bbbm_util_makedirs(const gchar *dir)
-{
-    if (!g_file_test(dir, G_FILE_TEST_EXISTS))
-    {
-        gchar *parent = g_path_get_dirname(dir);
-        if (strcmp(parent, "/"))
-        {
-            /* there is a parent other than / */
-            gint rc;
-            if ((rc = bbbm_util_makedirs(parent)))
-            {
-                g_free(parent);
-                return rc;
-            }
-        }
-        g_free(parent);
-        return mkdir(dir, 0755);
-    }
-    else if (!g_file_test(dir, G_FILE_TEST_IS_DIR))
-        return 1;
-    return 0;
-}
-
 gchar *bbbm_util_dirname(const gchar *filename)
 {
     gchar *dir = g_path_get_dirname(filename);
@@ -160,14 +137,6 @@ GList *bbbm_util_listdir(const gchar *dir)
     }
     g_dir_close(d);
     return files;
-}
-
-gchar *bbbm_util_get_size_str(gint width, gint height)
-{
-    /* with size 16, both sizes can take 7 digits, should be enough */
-    gchar text[16];
-    sprintf(text, "%dx%d", width, height);
-    return g_strdup(text);
 }
 
 static gboolean bbbm_util_has_ext(const gchar *file, const gchar *ext)

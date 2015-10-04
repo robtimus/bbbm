@@ -24,26 +24,49 @@
 #include <gtk/gtk.h>
 #include "bbbm.h"
 
-#define BBBM_IMAGE(obj)         ((BBBMImage *)(obj))
+#define BBBM_TYPE_IMAGE             (bbbm_image_get_type())
+#define BBBM_IMAGE(obj)             (G_TYPE_CHECK_INSTANCE_CAST((obj),\
+                                     BBBM_TYPE_IMAGE, BBBMImage))
+#define BBBM_IMAGE_CLASS(klass)     (G_TYPE_CHECK_CLASS_CAST((klass),\
+                                     BBBM_TYPE_IMAGE, BBBMImageClass))
+#define BBBM_IS_IMAGE(obj)          (G_TYPE_CHECK_INSTANCE_TYPE((obj),\
+                                     BBBM_TYPE_IMAGE))
+#define BBBM_IS_IMAGE_CLASS(klass)  (G_TYPE_CHECK_CLASS_TYPE((klass),\
+                                     BBBM_TYPE_IMAGE))
+#define BBBM_IMAGE_GET_CLASS(obj)   (G_TYPE_INSTANCE_GET_CLASS((obj),\
+                                     BBBM_TYPE_IMAGE, BBBMImageClass))
 
-typedef struct
+typedef struct _BBBMImage      BBBMImage;
+typedef struct _BBBMImageClass BBBMImageClass;
+
+struct _BBBMImage
 {
+    GtkEventBox parent;
     BBBM *bbbm;
-    GtkWidget *box;
+    GtkWidget *image;
     gchar *filename;
     gchar *description;
-} BBBMImage;
+};
 
-BBBMImage *bbbm_image_new(BBBM *bbbm, const gchar *filename,
-                          const gchar *description, const gchar *thumb);
+struct _BBBMImageClass
+{
+    GtkEventBoxClass parent_class;
+};
 
-void bbbm_image_destroy(BBBMImage *image);
+GType bbbm_image_get_type();
 
-const gchar *bbbm_image_get_filename(BBBMImage *image);
+GtkWidget *bbbm_image_new(BBBM *bbbm, const gchar *filename,
+                          const gchar *description, guint width, guint height);
 
-const gchar *bbbm_image_get_description(BBBMImage *image);
+G_CONST_RETURN gchar *bbbm_image_get_filename(BBBMImage *image);
+
+G_CONST_RETURN gchar *bbbm_image_get_description(BBBMImage *image);
 
 void bbbm_image_set_description(BBBMImage *image, const gchar *description);
+
+void bbbm_image_set_description_ref(BBBMImage *image, gchar *description);
+
+void bbbm_image_resize(BBBMImage *image, guint width, guint height);
 
 gint bbbm_image_compare_filename(BBBMImage *image1, BBBMImage *image2);
 
