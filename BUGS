@@ -1,0 +1,9 @@
+bbbm1 known bug list:
+----------------------------------------
+
+- Status bar is not cleared sometimes
+- When the thumb size is changed, the current thumbs are not resized
+
+If you happen to find a bug, please mail me.
+
+Rob Spoor <ice@iceman13.cjb.net>

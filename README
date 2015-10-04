@@ -1,0 +1,35 @@
+bbbm1 README file:
+----------------------------------------
+
+What is bbbm ?
+----------------------------------------
+bbbm stands for Blackbox background manager. It shows a collection of
+thumbnails, which can be set as the background, or viewed first.
+bbbm also allows for setting a random background and creating both a list of
+backgrounds, or a Blackbox background submenu.
+
+bbbm1 is the PyGTK1 version of bbbm, which is written for PyGTK2.
+
+What are the sytem requirements ?
+----------------------------------------
+o Python 1.5.2 or higher.
+o PyGTK. bbbm is created with PyGTK 0.6.9, but should work with any PyGTK
+  version IN THEORY.
+o GTK. The version is dependant of the PyGTK version.
+o Imlib. The version is dependant of the PyGTK version.
+o ImageMagick for creating the thumbnails.
+
+Although the name would suggest that Blackbox is needed, any command to set the
+background can be used. GQView is the default image viewer, but this can be
+changed as well.
+
+How to compile/install ?
+----------------------------------------
+just copy the bbbm1 file to a directory in the PATH variable, or to any other
+directory of choice.
+
+How to contact the author (me):
+----------------------------------------
+Just E-mail all bugreports (and fixes), suggestions or comments to
+ ice@iceman13.cjb.net
+and place the word `bbbm1' somewhere in the subject.
