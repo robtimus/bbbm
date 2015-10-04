@@ -21,12 +21,12 @@
 
 import sys, os, getopt
 from string import split, strip, lstrip
-from os.path import exists, expanduser, splitext, dirname
+from os.path import exists, expanduser, splitext, dirname, isdir, isfile
 from random import choice
 from ConfigParser import ConfigParser, NoOptionError
 import gtk, GdkImlib, GDK
 
-version = "0.1";
+version = "0.2";
 extensions = [".jpg", ".jpeg", ".gif", ".ppm", ".pgm"]
 homedir = expanduser("~/.bbbm")
 config = homedir + os.sep + "bbbm.cfg"
@@ -50,7 +50,8 @@ def read_options():
         try:
             option, value = split(line, " = ", 1)
         except ValueError:
-            sys.stderr.write("Error on line " + (i + 1) + ": " + line + "\n")
+            sys.stderr.write(config + ": error on line " + str(i + 1) + ": " +\
+                             line + "\n")
             sys.exit(1)
         if option == "set_command":
             set_command = value
@@ -780,12 +781,13 @@ class BBBM:
         self.context_id = self.status_bar.get_context_id("Statusbar")
         vbox.pack_end(self.status_bar, gtk.FALSE, gtk.FALSE, 0)
 
-        self.scroll = gtk.GtkScrolledWindow()
+        scroll = gtk.GtkScrolledWindow()
+        scroll.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
         self.table = gtk.GtkTable(1, 1, gtk.TRUE)
         self.table.show()
-        self.scroll.add_with_viewport(self.table)
-        vbox.pack_start(self.scroll, gtk.TRUE, gtk.TRUE, 0)
-        self.scroll.show()
+        scroll.add_with_viewport(self.table)
+        vbox.pack_start(scroll, gtk.TRUE, gtk.TRUE, 0)
+        scroll.show()
 
         menu_bar.show()
         self.status_bar.show()
@@ -802,7 +804,7 @@ class BBBM:
             ("/File/_Open...", "<ctrl>O", self.open, 0, None),
             ("/File/_Save", "<ctrl>S", self.save, 0, None),
             ("/File/Save _As...", "<ctrl><shift>S", self.save_as, 0, None),
-            ("/File/_Close", "<ctrl>C", self.close, 0, None),
+            ("/File/_Close", "<ctrl>X", self.close, 0, None),
             ("/File/sep", None, None, 0, "<Separator>"),
             ("/File/E_xit", "<alt>F4", self.exit, 0, None),
             ("/_Edit", None, None, 0, "<Branch>"),
@@ -841,7 +843,8 @@ class BBBM:
         chooser.show()
 
     def open0(self, widget, chooser):
-        self.open_collection(chooser.get_filename())
+        if isfile(chooser.get_filename()):
+            self.open_collection(chooser.get_filename())
         chooser.destroy()
 
     def open_collection(self, file):
@@ -919,7 +922,7 @@ class BBBM:
             self.add_img(file)
         chooser.destroy()
 
-    def add_img(self, filename, description=None):
+    def create_image(self, filename, description=None):
         global thumbsdir, thumb_size, thumb_cols
         if not description:
             description = filename
@@ -932,6 +935,10 @@ class BBBM:
               filename + " " + thumb
         os.system(cmd)
         image = Image(filename, description, thumb)
+        return image
+
+    def add_img(self, filename, description=None):
+        image = self.create_image(filename, description)
         # pass image twice; the first time it is recognized as a
         # gtk.GtkEventBox, only the second time as an Image
         image.connect_object("button-press-event", self.set_img, image, image)
@@ -969,7 +976,8 @@ class BBBM:
         chooser.show()
 
     def add_collection0(self, widget, chooser):
-        self.add_col(chooser.get_filename())
+        if isfile(chooser.get_filename()):
+            self.add_col(chooser.get_filename())
         chooser.destroy()
 
     def add_col(self, file):
@@ -984,8 +992,12 @@ class BBBM:
             except IndexError:
                 file, lines = strip(lines[0]), lines[1:]
                 desc = file
-            if exists(file) and splitext(file)[1] in extensions:
-                self.add_img(file, desc)
+            try:
+                if exists(file) and splitext(file)[1] in extensions:
+                    self.add_img(file, desc)
+            except TypeError:
+                # not a normal string, skip
+                continue
 
     def options(self, widget, data):
         global set_command, view_command, thumb_size, thumb_cols
@@ -1062,7 +1074,7 @@ class BBBM:
         view_command = values[1].get_text()
         if thumb_size != values[2].get_text():
             thumb_size = values[2].get_text()
-            # TODO: resize old thumbs
+            # TODO: resize thumbs. Can't get it to work yet...
         if thumb_cols != values[3].get_value_as_int():
             thumb_cols = values[3].get_value_as_int()
             self.layout(0)
@@ -1178,7 +1190,7 @@ class BBBM:
             menu_items = [
                 ("Set", self.set), ("View", self.view), ("<sep>", None),
                 ("Edit description", self.edit_descr),
-                ("Delete", self.delete)
+                ("Insert", self.insert), ("Delete", self.delete)
             ]
             for name, action in menu_items:
                 if name == "<sep>":
@@ -1236,6 +1248,49 @@ class BBBM:
         image.description = entry.get_text()
         dialog.destroy()
 
+    def insert(self, widget, image):
+        index = self.images.index(image)
+        # sometimes the statusbar does not get cleared; do it manually
+        self.clear_status(None, None)
+        chooser = gtk.GtkFileSelection("Select an image")
+        chooser.set_transient_for(self.window)
+        # center, regardless of where the parent is.
+        # This is the best alternative, since IN_POS_CENTER_ON_PARENT does not
+        # exists in GTK1
+        chooser.set_position(gtk.WIN_POS_CENTER)
+        # GTK1 has no support for multiple selections, so no need to set to
+        # single selection
+        chooser.hide_fileop_buttons()
+        chooser.ok_button.connect("clicked", self.insert0, chooser, index)
+        chooser.cancel_button.connect("clicked", self.close_dialog, chooser)
+        chooser.show()
+        
+    def insert0(self, widget, chooser, index):
+        global extensions
+        # GTK1 has no support for multiple selections, so just add one at a
+        # time
+        file = chooser.get_filename()
+        if splitext(file)[1] in extensions:
+            self.insert_img(file, index)
+        chooser.destroy()
+
+    def insert_img(self, filename, index):
+        image = self.create_image(filename, filename)
+        # pass image twice; the first time it is recognized as a
+        # gtk.GtkEventBox, only the second time as an Image
+        image.connect_object("button-press-event", self.set_img, image, image)
+        image.connect_object("button-release-event", self.popup, image, image)
+        image.connect_object("enter-notify-event", self.set_status, image,\
+                             image)
+        image.connect_object("leave-notify-event", self.clear_status, image)
+        image.show()
+        self.images.insert(index, image)
+        self.layout(index + 1)
+        c = index % thumb_cols
+        r = index / thumb_cols
+        self.table.attach(image, c, c + 1, r, r + 1, 0, 0,\
+                          self.padding, self.padding)
+
     def delete(self, widget, image):
         i = self.images.index(image)
         self.images.remove(image)
@@ -1270,15 +1325,20 @@ if __name__ == "__main__":
             print
             print "CopyRight 2004 Rob Spoor"
             sys.exit(0)
-    if not exists(homedir):
-        os.mkdir(homedir)
+    if not isdir(homedir):
+        if not exists(homedir):
+            os.mkdir(homedir)
+        else:
+            sys.stderr.write("bbbm1: " + homedir + " is not a directory\n")
+            sys.exit(1)
     if not exists(config):
         conf = open(config, "w")
         conf.close()
         set_command, view_command = "bsetbg", "gqview"
         thumb_size, thumb_cols = "128x96", 4
         write_options()
-    read_options()
+    else:
+        read_options()
 
     BBBM(files)
     gtk.mainloop()

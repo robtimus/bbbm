@@ -1,6 +1,14 @@
 bbbm1 ChangeLog
 ----------------------------------------
 
+0.2
+---
+ - Fixed a bug in the configuration file reading
+ - Introduced more error checking; no checking on file permissions though
+ - Set scrollbar policy to automatic
+ - Added inserting functionality
+ - Changed accelerator for Close to CTRL+X
+
 0.1
 ---
  - Initial version
