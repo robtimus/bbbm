@@ -22,6 +22,7 @@
 #define __BBBM_OPTIONS_H_
 
 #include <glib.h>
+#include "command.h"
 
 #define BBBM_OPTIONS_MAX_THUMB_WIDTH         (gdk_screen_width())
 #define BBBM_OPTIONS_MAX_THUMB_HEIGHT        (gdk_screen_height())
@@ -36,10 +37,7 @@ struct _BBBMOptions {
     guint thumb_column_count;
     gboolean filename_as_label;
     gboolean filename_as_title;
-    guint current_command_count;
-    guint new_command_count;
-    gchar **commands;
-    gchar **command_labels;
+    GList *commands;
 };
 
 /* Creates a new BBBMOptions object with default settings.
@@ -70,15 +68,13 @@ gboolean bbbm_options_set_filename_as_label(BBBMOptions *options, const gboolean
 const gboolean bbbm_options_get_filename_as_title(BBBMOptions *options);
 gboolean bbbm_options_set_filename_as_title(BBBMOptions *options, const gboolean filename_as_title);
 
-const guint bbbm_options_get_current_command_count(BBBMOptions *options);
-const guint bbbm_options_get_new_command_count(BBBMOptions *options);
+const guint bbbm_options_get_command_count(BBBMOptions *options);
 gboolean bbbm_options_set_command_count(BBBMOptions *options, const guint command_count);
 
-const gchar *bbbm_options_get_command(BBBMOptions *options, guint index);
-gboolean bbbm_options_set_command(BBBMOptions *options, guint index, const gchar *command);
-
-const gchar *bbbm_options_get_command_label(BBBMOptions *options, guint index);
-gboolean bbbm_options_set_command_label(BBBMOptions *options, guint index, const gchar *label);
+const GList *bbbm_options_get_commands(BBBMOptions *options);
+const BBBMCommand *bbbm_options_get_command(BBBMOptions *options, const guint index);
+gboolean bbbm_options_set_command(BBBMOptions *options, const guint index, const gchar *command, const gchar *label);
+void bbbm_options_add_command(BBBMOptions *options, const gchar *command, const gchar *label);
 
 void bbbm_options_destroy(BBBMOptions *options);
 

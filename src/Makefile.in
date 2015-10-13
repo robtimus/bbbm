@@ -91,8 +91,9 @@ CONFIG_CLEAN_VPATH_FILES =
 am__installdirs = "$(DESTDIR)$(bindir)"
 PROGRAMS = $(bin_PROGRAMS)
 am_bbbm_OBJECTS = bbbm-bbbm.$(OBJEXT) bbbm-dialogs.$(OBJEXT) \
-	bbbm-command_item.$(OBJEXT) bbbm-image.$(OBJEXT) \
-	bbbm-options.$(OBJEXT) bbbm-util.$(OBJEXT) bbbm-main.$(OBJEXT)
+	bbbm-command.$(OBJEXT) bbbm-command_item.$(OBJEXT) \
+	bbbm-image.$(OBJEXT) bbbm-options.$(OBJEXT) \
+	bbbm-util.$(OBJEXT) bbbm-main.$(OBJEXT)
 bbbm_OBJECTS = $(am_bbbm_OBJECTS)
 am__DEPENDENCIES_1 =
 bbbm_DEPENDENCIES = $(am__DEPENDENCIES_1)
@@ -252,6 +253,7 @@ top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
 bbbm_SOURCES = bbbm.c bbbm.h \
 		dialogs.c dialogs.h \
+		command.c command.h \
 		command_item.c command_item.h \
 		image.c image.h \
 		options.c options.h \
@@ -348,6 +350,7 @@ distclean-compile:
 	-rm -f *.tab.c
 
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/bbbm-bbbm.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/bbbm-command.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/bbbm-command_item.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/bbbm-dialogs.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/bbbm-image.Po@am__quote@
@@ -396,6 +399,20 @@ bbbm-dialogs.obj: dialogs.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='dialogs.c' object='bbbm-dialogs.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(bbbm_CFLAGS) $(CFLAGS) -c -o bbbm-dialogs.obj `if test -f 'dialogs.c'; then $(CYGPATH_W) 'dialogs.c'; else $(CYGPATH_W) '$(srcdir)/dialogs.c'; fi`
+
+bbbm-command.o: command.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(bbbm_CFLAGS) $(CFLAGS) -MT bbbm-command.o -MD -MP -MF $(DEPDIR)/bbbm-command.Tpo -c -o bbbm-command.o `test -f 'command.c' || echo '$(srcdir)/'`command.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/bbbm-command.Tpo $(DEPDIR)/bbbm-command.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='command.c' object='bbbm-command.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(bbbm_CFLAGS) $(CFLAGS) -c -o bbbm-command.o `test -f 'command.c' || echo '$(srcdir)/'`command.c
+
+bbbm-command.obj: command.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(bbbm_CFLAGS) $(CFLAGS) -MT bbbm-command.obj -MD -MP -MF $(DEPDIR)/bbbm-command.Tpo -c -o bbbm-command.obj `if test -f 'command.c'; then $(CYGPATH_W) 'command.c'; else $(CYGPATH_W) '$(srcdir)/command.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/bbbm-command.Tpo $(DEPDIR)/bbbm-command.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='command.c' object='bbbm-command.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(bbbm_CFLAGS) $(CFLAGS) -c -o bbbm-command.obj `if test -f 'command.c'; then $(CYGPATH_W) 'command.c'; else $(CYGPATH_W) '$(srcdir)/command.c'; fi`
 
 bbbm-command_item.o: command_item.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(bbbm_CFLAGS) $(CFLAGS) -MT bbbm-command_item.o -MD -MP -MF $(DEPDIR)/bbbm-command_item.Tpo -c -o bbbm-command_item.o `test -f 'command_item.c' || echo '$(srcdir)/'`command_item.c

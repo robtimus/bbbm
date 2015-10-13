@@ -25,6 +25,7 @@
 #include <gtk/gtk.h>
 #include "config.h"
 #include "bbbm.h"
+#include "command.h"
 #include "image.h"
 #include "command_item.h"
 #include "dialogs.h"
@@ -89,6 +90,7 @@ static gboolean bbbm_create_menu(BBBM *bbbm, const gchar *filename);
 static inline void bbbm_write_string(FILE *file, const gchar *string);
 
 /* image utility functions */
+static inline void bbbm_attach_image(GtkTable *table, GtkWidget *image, guint x, guint y);
 static void bbbm_reset_images(BBBM *bbbm, guint index);
 static inline void bbbm_resize_thumbs(BBBM *bbbm);
 
@@ -400,7 +402,7 @@ static gboolean bbbm_image_mouse_release(GtkWidget *widget, GdkEventButton *even
         GtkWidget *popup;
         GtkWidget *item;
         GtkItemFactory *factory;
-        guint i;
+        const GList *iterator;
         gint index;
 
         factory = gtk_item_factory_new(GTK_TYPE_MENU, "<popup>", NULL);
@@ -416,9 +418,13 @@ static gboolean bbbm_image_mouse_release(GtkWidget *widget, GdkEventButton *even
         }
         /* add the commands */
         index = 2;
-        for (i = 0; i < bbbm_options_get_current_command_count(image->bbbm->options); i++) {
-            const gchar *command = bbbm_options_get_command(image->bbbm->options, i);
-            const gchar *label   = bbbm_options_get_command_label(image->bbbm->options, i);
+        for (iterator = bbbm_options_get_commands(image->bbbm->options); iterator != NULL; iterator = iterator->next) {
+            BBBMCommand *cmd;
+            const gchar *command, *label;
+
+            cmd     = (BBBMCommand *) iterator->data;
+            command = bbbm_command_get_command(cmd);
+            label   = bbbm_command_get_label(cmd);
 
             if (!bbbm_str_empty(command)) {
                 if (bbbm_str_empty(label)) {
@@ -698,7 +704,7 @@ static gboolean bbbm_add_image(BBBM *bbbm, const gchar *filename, const gchar *d
         bbbm->images = g_list_insert(bbbm->images, image, index);
         bbbm_reset_images(bbbm, index + 1);
     }
-    gtk_table_attach(GTK_TABLE(bbbm->table), image, col, col + 1, row, row + 1, 0, 0, PADDING, PADDING);
+    bbbm_attach_image(GTK_TABLE(bbbm->table), image, col, row);
     bbbm_set_modified(bbbm, TRUE);
     bbbm_update_item_enabled_states(bbbm);
     return TRUE;
@@ -838,6 +844,10 @@ static inline void bbbm_write_string(FILE *file, const gchar *string) {
     }
 }
 
+static inline void bbbm_attach_image(GtkTable *table, GtkWidget *image, guint x, guint y) {
+    gtk_table_attach(table, image, x, x + 1, y, y + 1, 0, 0, PADDING, PADDING);
+}
+
 static void bbbm_reset_images(BBBM *bbbm, guint index) {
     GList *iterator;
     guint image_count, column_count;
@@ -852,8 +862,10 @@ static void bbbm_reset_images(BBBM *bbbm, guint index) {
 
         c = index % column_count;
         r = index / column_count;
+        iterator->data = g_object_ref(iterator->data);
         gtk_container_remove(GTK_CONTAINER(bbbm->table), GTK_WIDGET(iterator->data));
-        gtk_table_attach(GTK_TABLE(bbbm->table), GTK_WIDGET(iterator->data), c, c + 1, r, r + 1, 0, 0, PADDING, PADDING);
+        bbbm_attach_image(GTK_TABLE(bbbm->table), GTK_WIDGET(iterator->data), c, r);
+        g_object_unref(iterator->data);
     }
     gtk_table_resize(GTK_TABLE(bbbm->table), MAX(rows, 1), MAX(cols, 1));
 }

@@ -1,3 +1,7 @@
+2015-10-14  rob.spoor  <bbbm@icemanx.nl>
+
+	Refactored the options to support a dynamic number of commands
+
 2015-10-04  rob.spoor  <bbbm@icemanx.nl>
 
 	Rebuilt the build process to use autoconf, automake, etc

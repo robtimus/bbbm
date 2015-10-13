@@ -41,7 +41,6 @@
 #define BBBM_OPTIONS_DEFAULT_THUMB_COLUMN_COUNT  4
 #define BBBM_OPTIONS_DEFAULT_FILENAME_AS_LABEL   FALSE
 #define BBBM_OPTIONS_DEFAULT_FILENAME_AS_TITLE   FALSE
-#define BBBM_OPTIONS_DEFAULT_COMMAND_COUNT       10
 
 #define BBBM_OPTIONS_READ_BUFFER_SIZE            8192
 
@@ -49,9 +48,6 @@ typedef struct {
     BBBMOptions *options;
     /* the stack of text data for the current element stack */
     GSList *text_stack;
-    /* lists for commands and command labels */
-    GSList *command_list;
-    GSList *command_label_list;
     /* the command and command label for the current bbbm/commands/command element; reset each time */
     gchar *command;
     gchar *command_label;
@@ -117,19 +113,13 @@ BBBMOptions *bbbm_options_new() {
     BBBMOptions *options;
 
     options = g_malloc(sizeof(BBBMOptions));
-    options->set_command           = g_strdup(BBBM_OPTIONS_DEFAULT_SET_COMMAND);
-    options->thumb_width           = BBBM_OPTIONS_DEFAULT_THUMB_WIDTH;
-    options->thumb_height          = BBBM_OPTIONS_DEFAULT_THUMB_HEIGHT;
-    options->thumb_column_count    = BBBM_OPTIONS_DEFAULT_THUMB_COLUMN_COUNT;
-    options->filename_as_label     = BBBM_OPTIONS_DEFAULT_FILENAME_AS_LABEL;
-    options->filename_as_title     = BBBM_OPTIONS_DEFAULT_FILENAME_AS_TITLE;
-    options->current_command_count = BBBM_OPTIONS_DEFAULT_COMMAND_COUNT;
-    options->new_command_count     = options->current_command_count;
-    options->commands              = g_malloc(options->current_command_count * sizeof(gchar *));
-    options->command_labels        = g_malloc(options->current_command_count * sizeof(gchar *));
-    /* clear the commands and command labels */
-    memset(options->commands,       0, options->current_command_count * sizeof(gchar *));
-    memset(options->command_labels, 0, options->current_command_count * sizeof(gchar *));
+    options->set_command        = g_strdup(BBBM_OPTIONS_DEFAULT_SET_COMMAND);
+    options->thumb_width        = BBBM_OPTIONS_DEFAULT_THUMB_WIDTH;
+    options->thumb_height       = BBBM_OPTIONS_DEFAULT_THUMB_HEIGHT;
+    options->thumb_column_count = BBBM_OPTIONS_DEFAULT_THUMB_COLUMN_COUNT;
+    options->filename_as_label  = BBBM_OPTIONS_DEFAULT_FILENAME_AS_LABEL;
+    options->filename_as_title  = BBBM_OPTIONS_DEFAULT_FILENAME_AS_TITLE;
+    options->commands           = NULL;
 
     return options;
 }
@@ -138,8 +128,6 @@ BBBMOptions *bbbm_options_read_from_file(const gchar *filename) {
     FILE *file;
     gchar contents[BBBM_OPTIONS_READ_BUFFER_SIZE];
     gint len;
-    GSList *command_iterator, *command_label_iterator;
-    int i;
 
     GMarkupParser parser;
     GMarkupParseContext *context;
@@ -166,11 +154,9 @@ BBBMOptions *bbbm_options_read_from_file(const gchar *filename) {
     options->set_command = NULL;
 
     parse_data.options                  = options;
-    parse_data.text_stack               = NULL; /* empty stack */
-    parse_data.command_list             = NULL; /* empty command list */
-    parse_data.command_label_list       = NULL; /* empty command label list */
-    parse_data.command                  = NULL; /* no command */;
-    parse_data.command_label            = NULL; /* no command label */
+    parse_data.text_stack               = NULL;  /* empty stack */
+    parse_data.command                  = NULL;  /* no command */;
+    parse_data.command_label            = NULL;  /* no command label */
     parse_data.found_thumbs             = FALSE; /* bbbm/thumbs */
     parse_data.found_thumb_size         = FALSE;;/* bbbm/thumbs/size */
     parse_data.found_thumb_column_count = FALSE; /* bbbm/thumbs/column-count */
@@ -204,26 +190,6 @@ BBBMOptions *bbbm_options_read_from_file(const gchar *filename) {
     }
     g_markup_parse_context_free(context);
     bbbm_options_close_file(file, filename);
-
-    options->current_command_count = g_slist_length(parse_data.command_list);
-    options->new_command_count     = options->current_command_count;
-    options->commands              = g_malloc(options->current_command_count * sizeof(gchar *));
-    options->command_labels        = g_malloc(options->current_command_count * sizeof(gchar *));
-    /* clear the commands and command labels */
-    memset(options->commands,       0, options->current_command_count * sizeof(gchar *));
-    memset(options->command_labels, 0, options->current_command_count * sizeof(gchar *));
-
-    command_iterator       = parse_data.command_list;
-    command_label_iterator = parse_data.command_label_list;
-    for (i = 0; i < options->current_command_count; i++) {
-        options->commands[i]       = (gchar *) command_iterator->data;
-        options->command_labels[i] = (gchar *) command_label_iterator->data;
-
-        command_iterator       = g_slist_next(command_iterator);
-        command_label_iterator = g_slist_next(command_label_iterator);
-    }
-    g_slist_free(parse_data.command_list);
-    g_slist_free(parse_data.command_label_list);
 
     if (!parse_data.found_thumb_size) {
         g_info("option thumb size missing. Using default value %dx%d",
@@ -278,8 +244,8 @@ BBBMOptions *bbbm_options_read_from_file(const gchar *filename) {
 }
 
 void bbbm_options_write_to_file(BBBMOptions *options, const gchar *filename) {
-    int i;
     FILE *file;
+    GList *iterator;
 
     g_return_if_fail(options != NULL);
     g_return_if_fail(!bbbm_str_empty(filename));
@@ -310,13 +276,17 @@ void bbbm_options_write_to_file(BBBMOptions *options, const gchar *filename) {
     } else {
         fprintf(file, "    <set-command />\n");
     }
-    for (i = 0; i < options->new_command_count; i++) {
-        if (i < options->current_command_count
-            && (!bbbm_str_empty(options->commands[i]) || !bbbm_str_empty(options->command_labels[i]))) {
+    for (iterator = options->commands; iterator != NULL; iterator = iterator->next) {
+        BBBMCommand *cmd;
+        const gchar *command, *label;
 
+        cmd     = (BBBMCommand *) iterator->data;
+        command = bbbm_command_get_command(cmd);
+        label   = bbbm_command_get_label(cmd);
+        if (!bbbm_str_empty(command)  || !bbbm_str_empty(label)) {
             fprintf(file, "    <command>\n");
-            bbbm_options_write_element(file, "      <command>%s</command>\n", options->commands[i]);
-            bbbm_options_write_element(file, "      <label>%s</label>\n", options->command_labels[i]);
+            bbbm_options_write_element(file, "      <command>%s</command>\n", command);
+            bbbm_options_write_element(file, "      <label>%s</label>\n", label);
             fprintf(file, "    </command>\n");
         } else {
             fprintf(file, "    <command />\n");
@@ -405,72 +375,69 @@ gboolean bbbm_options_set_filename_as_title(BBBMOptions *options, const gboolean
     return FALSE;
 }
 
-const guint bbbm_options_get_current_command_count(BBBMOptions *options) {
+const guint bbbm_options_get_command_count(BBBMOptions *options) {
     g_return_val_if_fail(options != NULL, 0);
-    return options->current_command_count;
-}
-
-const guint bbbm_options_get_new_command_count(BBBMOptions *options) {
-    g_return_val_if_fail(options != NULL, 0);
-    return options->new_command_count;
+    return g_list_length(options->commands);
 }
 
 gboolean bbbm_options_set_command_count(BBBMOptions *options, const guint command_count) {
+    guint current_count;
+    gboolean result;
+
     g_return_val_if_fail(options != NULL, FALSE);
-    if (command_count != options->new_command_count) {
-        options->new_command_count = command_count;
-        return TRUE;
+    result = FALSE;
+    current_count = g_list_length(options->commands);
+    while (current_count < command_count) {
+        bbbm_options_add_command(options, NULL, NULL);
+        current_count++;
+        result = TRUE;
     }
-    return FALSE;
+    while (current_count > command_count) {
+        GList *last;
+
+        last = g_list_last(options->commands);
+        g_free(last->data);
+        options->commands = g_list_delete_link(options->commands, last);
+        current_count--;
+        result = TRUE;
+    }
+    return result;
 }
 
-const gchar *bbbm_options_get_command(BBBMOptions *options, guint index) {
+const GList *bbbm_options_get_commands(BBBMOptions *options) {
     g_return_val_if_fail(options != NULL, NULL);
-    g_return_val_if_fail(0 <= index && index < options->current_command_count, NULL);
-    return options->commands[index];
+    return options->commands;
 }
 
-gboolean bbbm_options_set_command(BBBMOptions *options, guint index, const gchar *command) {
-    g_return_val_if_fail(options != NULL, FALSE);
-    g_return_val_if_fail(0 <= index && index < options->current_command_count, FALSE);
-    if (!bbbm_str_equals(command, options->commands[index])) {
-
-        g_free(options->commands[index]);
-        options->commands[index] = g_strdup(command);
-        return TRUE;
-    }
-    return FALSE;
-}
-
-const gchar *bbbm_options_get_command_label(BBBMOptions *options, guint index) {
+const BBBMCommand *bbbm_options_get_command(BBBMOptions *options, const guint index) {
     g_return_val_if_fail(options != NULL, NULL);
-    g_return_val_if_fail(0 <= index && index < options->current_command_count, NULL);
-    return options->command_labels[index];
+    return (BBBMCommand *) g_list_nth_data(options->commands, index);
 }
 
-gboolean bbbm_options_set_command_label(BBBMOptions *options, guint index, const gchar *label) {
-    g_return_val_if_fail(options != NULL, FALSE);
-    g_return_val_if_fail(0 <= index && index < options->current_command_count, FALSE);
-    if (!bbbm_str_equals(label, options->command_labels[index])) {
+gboolean bbbm_options_set_command(BBBMOptions *options, const guint index, const gchar *command, const gchar *label) {
+    BBBMCommand *cmd;
+    gboolean result;
 
-        g_free(options->command_labels[index]);
-        options->command_labels[index] = g_strdup(label);
-        return TRUE;
-    }
-    return FALSE;
+    g_return_val_if_fail(options != NULL, FALSE);
+    cmd = (BBBMCommand *) g_list_nth_data(options->commands, index);
+    g_return_val_if_fail(cmd != NULL, FALSE);
+    result = bbbm_command_set_command(cmd, command);
+    result |= bbbm_command_set_label(cmd, label);
+    return result;
+}
+
+void bbbm_options_add_command(BBBMOptions *options, const gchar *command, const gchar *label) {
+    BBBMCommand *cmd;
+
+    g_return_if_fail(options != NULL);
+    cmd = bbbm_command_new(command, label);
+    options->commands = g_list_append(options->commands, cmd);
 }
 
 void bbbm_options_destroy(BBBMOptions *options) {
-    int i;
-
     g_return_if_fail(options != NULL);
     g_free(options->set_command);
-    for (i = 0; i < options->current_command_count; i++) {
-        g_free(options->commands[i]);
-        g_free(options->command_labels[i]);
-    }
-    g_free(options->commands);
-    g_free(options->command_labels);
+    g_list_free_full(options->commands, (GDestroyNotify) bbbm_command_destroy);
     g_free(options);
 }
 
@@ -770,10 +737,11 @@ static void bbbm_options_parse_end_element(GMarkupParseContext *context,
                     g_debug("found set command '%s'",
                             parse_data->options->set_command);
                 } else if (bbbm_str_equals("command", element_name)) {
-                    parse_data->command_list       = g_slist_append(parse_data->command_list,       parse_data->command);
-                    parse_data->command_label_list = g_slist_append(parse_data->command_label_list, parse_data->command_label);
                     g_debug("found command '%s' with label '%s'",
                             parse_data->command, parse_data->command_label);
+                    if (!bbbm_str_empty(parse_data->command) || !bbbm_str_empty(parse_data->command_label)) {
+                        bbbm_options_add_command(parse_data->options, parse_data->command, parse_data->command_label);
+                    }
                     parse_data->command = NULL;
                     parse_data->command_label = NULL;
                 }

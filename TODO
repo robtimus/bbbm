@@ -1,8 +1,6 @@
 TODO list
 ---------
 
-- Refactor command support to make the number of commands dynamic
+- Add support for translations (gettext)
 
 - Optionally store the last location, size and window state
-
-- Add support for translations (gettext)
