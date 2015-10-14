@@ -1,7 +1,14 @@
 2015-10-14  rob.spoor  <bbbm@icemanx.nl>
 
-	Refactored the options to support a dynamic number of commands
+	Enabled the migration tool to support both Python 2 and 3
+
+2015-10-14  rob.spoor  <bbbm@icemanx.nl>
+
 	Added higher minimum versions for gtk+-2.0 and glib-2.0
+
+2015-10-14  rob.spoor  <bbbm@icemanx.nl>
+
+	Refactored the options to support a dynamic number of commands
 
 2015-10-04  rob.spoor  <bbbm@icemanx.nl>
 

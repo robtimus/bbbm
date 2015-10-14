@@ -7,6 +7,7 @@ bbbm ChangeLog
  - The build process has been changed to use ./configure.
  - Converted the configuration to use XML. A utility tool (tools/migrate.py) has
    been provided to convert any existing configuration file.
+   Note that Python 2 or 3 is required to run this tool (Python 1 won't work).
  - The "view" command has been dropped in favor of a custom command
  - The list of commands is now dynamic. Commands can be added and removed as
    needed from the options dialog.

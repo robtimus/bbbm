@@ -6,7 +6,7 @@ import sys, os, getopt, re, xml.dom.minidom
 
 try:
 	options, files = getopt.getopt(sys.argv[1:], "hi:o:", ["help", "input=", "output="])
-except getopt.error, e:
+except getopt.error as e:
 	sys.stderr.write("%s: %s\n" % (sys.argv[0], str(e)))
 	sys.stderr.write("Try %s --help for more information\n" % sys.argv[0])
 	sys.exit(1)
@@ -16,19 +16,22 @@ output_file = "~/.bbbm/bbbm.xml"
 
 for option, value in options:
 	if option == "-h" or option == "--help":
-		print "Usage: %s [OPTIONS]" % sys.argv[0]
-		print "Converts an old style BBBM configuration file into a new style one"
-		print
-		print "  -h, --help            Output this help and exit"
-		print "  -i, --input=<input>   Convert <input>; defaults to ~/.bbbm/bbbm.cfg"
-		print "  -o, --output=<output> Convert to <output>; defaults to ~/bbbm/bbbm.xml"
+		print("Usage: %s [OPTIONS]" % sys.argv[0])
+		print("Converts an old style BBBM configuration file into a new style one")
+		if sys.version_info[0] == 2:
+			print
+		else:
+			print()
+		print("  -h, --help            Output this help and exit")
+		print("  -i, --input=<input>   Convert <input>; defaults to ~/.bbbm/bbbm.cfg")
+		print("  -o, --output=<output> Convert to <output>; defaults to ~/bbbm/bbbm.xml")
 		sys.exit(0)
 	elif option == "-i" or option == "--input":
 		input_file = value
 	elif option == "-o" or option == "--output":
 		output_file = value
 
-print "Converting '%s' to '%s'\n" % (input_file, output_file)
+print("Converting '%s' to '%s'\n" % (input_file, output_file))
 
 set_command = None
 view_command = None
@@ -56,14 +59,14 @@ try:
 	fin = open(os.path.expanduser(input_file), "r")
 	lines = fin.readlines()
 	fin.close()
-except IOError, e:
+except IOError as e:
 	sys.stderr.write("%s: could not read '%s': %s\n" % (sys.argv[0], input_file, str(e)))
 	sys.exit(1)
 
-for i in xrange(len(lines)):
+for i in range(len(lines)):
 	line = lines[i][:-1].lstrip()
 	if not line or line[0] == "#":
-		continue;
+		continue
 	try:
 		option, value = line.split("=", 1)
 		option = option.strip()
@@ -122,23 +125,26 @@ labels = ensure_size(labels, len(commands))
 
 # report findings
 
-print "Found the following values:"
+print("Found the following values:")
 if set_command != None:
-	print "- set command: %s" % set_command
+	print("- set command: %s" % set_command)
 if view_command != None:
-	print "- view command: %s" % view_command
+	print("- view command: %s" % view_command)
 if thumb_width != None and thumb_height != None:
-	print "- thumb size: %dx%d" % (thumb_width, thumb_height)
+	print("- thumb size: %dx%d" % (thumb_width, thumb_height))
 if thumb_column_count != None:
-	print "- thumb column count: %d" % thumb_column_count
+	print("- thumb column count: %d" % thumb_column_count)
 if filename_as_label != None:
-	print "- filename as label: %s" % str(filename_as_label).upper()
+	print("- filename as label: %s" % ("false", "true")[filename_as_label])
 if filename_as_title != None:
-	print "- filename as title: %s" % str(filename_as_title).upper()
-print "- commands:"
-for i in xrange(len(commands)):
-	print "  - '%s' (%s)" % (commands[i], ("no label", labels[i])[labels[i] != None])
-print
+	print("- filename as title: %s" % ("false", "true")[filename_as_title])
+print("- commands:")
+for i in range(len(commands)):
+	print("  - '%s' (%s)" % (commands[i], ("no label", labels[i])[labels[i] != None]))
+if sys.version_info[0] == 2:
+	print
+else:
+	print()
 
 # check for overwrite
 
@@ -147,7 +153,11 @@ if os.path.isfile(os.path.expanduser(output_file)):
 	overwrite_file = False
 	while True:
 		sys.stderr.write("File '%s' already exists. Overwrite? [Y/n] " % output_file)
-		choice = raw_input().lower()
+		if sys.version_info[0] == 2:
+			choice = raw_input().lower()
+		else:
+			choice = input().lower()
+
 		if choice == '':
 			overwrite_file = True
 		elif choice in valid_options:
@@ -164,13 +174,16 @@ commands = ensure_size(commands, 10)
 labels = ensure_size(labels, 10)
 
 def escape_xml(value):
-	text = xml.dom.minidom.Text();
-	text.data = value
+	try:
+		text = xml.dom.minidom.Text()
+		text.data = value
+	except TypeError:
+		text = xml.dom.minidom.Text(value)
 	return text.toxml()
 
 try:
 	fout = open(os.path.expanduser(output_file), "w")
-except IOError, e:
+except IOError as e:
 	sys.stderr.write("%s: could not write to '%s': %s\n" % (sys.argv[0], output_file, str(e)))
 	sys.exit(1)
 
@@ -189,9 +202,9 @@ if (thumb_width != None and thumb_height != None) or thumb_column_count != None:
 if filename_as_label != None or filename_as_title != None:
 	fout.write("  <menu>\n")
 	if filename_as_label != None:
-		fout.write("    <filename-as-label>%s</filename-as-label>\n" % str(filename_as_label).lower())
+		fout.write("    <filename-as-label>%s</filename-as-label>\n" % ("false", "true")[filename_as_label])
 	if filename_as_title != None:
-		fout.write("    <filename-as-title>%s</filename-as-title>\n" % str(filename_as_title).lower())
+		fout.write("    <filename-as-title>%s</filename-as-title>\n" % ("false", "true")[filename_as_title])
 	fout.write("  </menu>\n")
 fout.write("  <commands>\n")
 if set_command != None:
@@ -203,7 +216,7 @@ if view_command != None:
 	fout.write("      <command>%s</command>\n" % escape_xml(view_command))
 	fout.write("      <label>View</label>\n")
 	fout.write("    </command>\n")
-for i in xrange(len(commands)):
+for i in range(len(commands)):
 	if commands[i] != None or labels[i] != None:
 		fout.write("    <command>\n")
 		if commands[i] != None:
@@ -218,4 +231,4 @@ fout.write("</bbbm>\n")
 
 fout.close() 
 
-print "Wrote converted configuration to '%s'" % output_file
+print("Wrote converted configuration to '%s'" % output_file)
