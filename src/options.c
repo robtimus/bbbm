@@ -152,6 +152,7 @@ BBBMOptions *bbbm_options_read_from_file(const gchar *filename) {
 
     options = g_malloc(sizeof(BBBMOptions));
     options->set_command = NULL;
+    options->commands    = NULL;
 
     parse_data.options                  = options;
     parse_data.text_stack               = NULL;  /* empty stack */

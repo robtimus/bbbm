@@ -1,6 +1,7 @@
 2015-10-14  rob.spoor  <bbbm@icemanx.nl>
 
 	Refactored the options to support a dynamic number of commands
+	Added higher minimum versions for gtk+-2.0 and glib-2.0
 
 2015-10-04  rob.spoor  <bbbm@icemanx.nl>
 

@@ -594,7 +594,6 @@ static void bbbm_dialogs_delete_command(GtkWidget *widget, GdkEvent *event, stru
 static void bbbm_dialogs_add_command(GtkWidget *widget, GdkEvent *event, struct BBBMCommandList *commands) {
     GtkWidget *label_entry, *command_entry, *delete_button;
     GtkAdjustment *adjustment;
-    gdouble upper;
     guint index;
 
     label_entry = gtk_entry_new();
@@ -622,6 +621,5 @@ static void bbbm_dialogs_add_command(GtkWidget *widget, GdkEvent *event, struct 
     gtk_widget_show_all(commands->table);
 
     adjustment = gtk_scrolled_window_get_vadjustment(GTK_SCROLLED_WINDOW(commands->scrolled_window));
-    upper = gtk_adjustment_get_upper(adjustment);
-    gtk_adjustment_set_value(adjustment, upper);
+    gtk_adjustment_set_value(adjustment, adjustment->upper);
 }

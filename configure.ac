@@ -12,7 +12,8 @@ AC_CONFIG_HEADERS([config.h])
 
 AC_PROG_CC
 
-PKG_CHECK_MODULES([GTK], [gtk+-2.0])
+PKG_CHECK_MODULES([GLIB], [glib-2.0 >= 2.28])
+PKG_CHECK_MODULES([GTK], [gtk+-2.0 >= 2.6])
 
 AC_HEADER_STDC
 AC_CHECK_HEADERS([unistd.h sys/stat.h sys/wait.h getopt.h])

@@ -24,6 +24,11 @@
 #include <stdarg.h>
 #include <glib.h>
 
+/* if not defined (because glib is too old), define g_info here */
+#ifndef g_info
+#define g_info(...)  g_log(G_LOG_DOMAIN, G_LOG_LEVEL_INFO, __VA_ARGS__)
+#endif
+
 /* Returns whether or not the given string is NULL or empty */
 gboolean bbbm_str_empty(const gchar *str);
 
