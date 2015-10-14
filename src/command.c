@@ -26,7 +26,6 @@ BBBMCommand *bbbm_command_new(const gchar *command, const gchar *label) {
     BBBMCommand *cmd;
 
     cmd = g_malloc(sizeof(BBBMCommand));
-    cmd->id = 12345;
     cmd->command = g_strdup(command);
     cmd->label   = g_strdup(label);
 

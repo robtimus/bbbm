@@ -26,7 +26,6 @@
 typedef struct _BBBMCommand BBBMCommand;
 
 struct _BBBMCommand {
-    guint id;
     gchar *command;
     gchar *label;
 };
