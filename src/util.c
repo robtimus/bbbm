@@ -28,6 +28,7 @@
 #include <glib.h>
 #include "config.h"
 #include "util.h"
+#include "compat.h"
 
 static gboolean bbbm_util_has_ext(const gchar *file, const gchar *ext);
 

@@ -178,8 +178,6 @@ ECHO_N = @ECHO_N@
 ECHO_T = @ECHO_T@
 EGREP = @EGREP@
 EXEEXT = @EXEEXT@
-GLIB_CFLAGS = @GLIB_CFLAGS@
-GLIB_LIBS = @GLIB_LIBS@
 GREP = @GREP@
 GTK_CFLAGS = @GTK_CFLAGS@
 GTK_LIBS = @GTK_LIBS@
@@ -260,6 +258,7 @@ bbbm_SOURCES = bbbm.c bbbm.h \
 		image.c image.h \
 		options.c options.h \
 		util.c util.h \
+		compat.h \
 		main.c
 
 bbbm_CFLAGS = -Wall -O2 -pedantic $(GTK_CFLAGS)

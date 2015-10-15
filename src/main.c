@@ -30,6 +30,7 @@
 #include "bbbm.h"
 #include "options.h"
 #include "util.h"
+#include "compat.h"
 
 static void clean_up_child_process(int signal_number) {
     wait(NULL);

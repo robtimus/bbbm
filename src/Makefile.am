@@ -6,6 +6,7 @@ bbbm_SOURCES = bbbm.c bbbm.h \
 		image.c image.h \
 		options.c options.h \
 		util.c util.h \
+		compat.h \
 		main.c
 bbbm_CFLAGS = -Wall -O2 -pedantic $(GTK_CFLAGS)
 bbbm_LDADD = $(GTK_LIBS)

@@ -23,10 +23,12 @@
 #include "config.h"
 #include "command_item.h"
 #include "util.h"
+#include "compat.h"
 
 static void bbbm_command_item_class_init(BBBMCommandItemClass *klass);
 static void bbbm_command_item_init(BBBMCommandItem *item);
 static void bbbm_command_item_destroy(GtkObject *object);
+static BBBMCommandItem *bbbm_command_item_new_no_command(const gchar *label);
 
 static GtkEventBoxClass *bbbm_command_item_parent_class = NULL;
 
@@ -72,13 +74,32 @@ static void bbbm_command_item_destroy(GtkObject *object) {
     (* GTK_OBJECT_CLASS(bbbm_command_item_parent_class)->destroy) (object);
 }
 
+static BBBMCommandItem *bbbm_command_item_new_no_command(const gchar *label) {
+    BBBMCommandItem *item;
+#if HAVE_GTK_MENU_ITEM_LABEL == 0
+    GtkWidget *label_widget;
+
+    g_debug("gtk_menu_item's label property is not available, adding a label widget instead");
+    item = BBBM_COMMAND_ITEM(g_object_new(BBBM_TYPE_COMMAND_ITEM, NULL));
+    label_widget = gtk_label_new(label);
+    gtk_misc_set_alignment(GTK_MISC(label_widget), 0.0, 0.5);
+    gtk_container_add(GTK_CONTAINER(item), label_widget);
+    gtk_widget_show(label_widget);
+#else
+
+    g_debug("gtk_menu_item's label property is available, using it");
+    item = BBBM_COMMAND_ITEM(g_object_new(BBBM_TYPE_COMMAND_ITEM, "label", label, NULL));
+#endif
+    return item;
+}
+
 GtkWidget *bbbm_command_item_new(const gchar *label, const gchar *command) {
     BBBMCommandItem *item;
 
     g_return_val_if_fail(label != NULL, NULL);
     g_return_val_if_fail(command != NULL, NULL);
 
-    item = BBBM_COMMAND_ITEM(g_object_new(BBBM_TYPE_COMMAND_ITEM, "label", label, NULL));
+    item = bbbm_command_item_new_no_command(label);
     item->command = g_strdup(command);
 
     return GTK_WIDGET(item);
@@ -91,7 +112,7 @@ GtkWidget *bbbm_command_item_new_for_file(const gchar *label, const gchar *comma
     g_return_val_if_fail(command != NULL, NULL);
     g_return_val_if_fail(filename != NULL, NULL);
 
-    item = BBBM_COMMAND_ITEM(g_object_new(BBBM_TYPE_COMMAND_ITEM, "label", label, NULL));
+    item = bbbm_command_item_new_no_command(label);
     item->command = bbbm_util_get_command(command, filename);
 
     return GTK_WIDGET(item);

@@ -26,6 +26,7 @@
 #include "options.h"
 #include "bbbm.h"
 #include "util.h"
+#include "compat.h"
 
 #define PADDING                5
 #define OPTION_LABEL_ALIGN_X   1
@@ -49,8 +50,10 @@ static inline void bbbm_dialogs_attach_command_widgets(GtkTable *table,
                                                        guint y);
 static inline void bbbm_dialogs_attach_add_command_button(GtkTable *table, GtkWidget *add_button, guint y);
 static inline void bbbm_dialogs_reattach_add_command_button(GtkTable *table, GtkWidget *add_button, guint y);
-static void bbbm_dialogs_delete_command(GtkWidget *widget, GdkEvent *event, struct BBBMCommandList *commands);
-static void bbbm_dialogs_add_command(GtkWidget *widget, GdkEvent *event, struct BBBMCommandList *commands);
+static void bbbm_dialogs_delete_command(GtkButton *button, struct BBBMCommandList *commands);
+static void bbbm_dialogs_add_command(GtkButton *button, struct BBBMCommandList *commands);
+
+static GtkWidget *bbbm_dialogs_create_button(const gchar *stock_id);
 
 gboolean bbbm_dialogs_question(GtkWindow *parent, const gchar *title, const gchar *format, ...) {
     gboolean result;
@@ -360,8 +363,7 @@ guint bbbm_dialogs_options(GtkWindow *parent, BBBMOptions *options) {
         }
         commands.command_entries = g_list_append(commands.command_entries, command_entry);
 
-        delete_button = gtk_button_new();
-        gtk_button_set_image(GTK_BUTTON(delete_button), gtk_image_new_from_stock(GTK_STOCK_DELETE, GTK_ICON_SIZE_BUTTON));
+        delete_button = bbbm_dialogs_create_button(GTK_STOCK_DELETE);
         g_signal_connect(GTK_OBJECT(delete_button), "clicked", G_CALLBACK(bbbm_dialogs_delete_command), &commands);
         commands.delete_buttons = g_list_append(commands.delete_buttons, delete_button);
         gtk_size_group_add_widget(commands.size_group, delete_button);
@@ -369,8 +371,7 @@ guint bbbm_dialogs_options(GtkWindow *parent, BBBMOptions *options) {
         bbbm_dialogs_attach_command_widgets(GTK_TABLE(commands.table), label_entry, command_entry, delete_button, i + 1);
     }
 
-    commands.add_button = gtk_button_new();
-    gtk_button_set_image(GTK_BUTTON(commands.add_button), gtk_image_new_from_stock(GTK_STOCK_ADD, GTK_ICON_SIZE_BUTTON));
+    commands.add_button = bbbm_dialogs_create_button(GTK_STOCK_ADD);
     g_signal_connect(GTK_OBJECT(commands.add_button), "clicked", G_CALLBACK(bbbm_dialogs_add_command), &commands);
     gtk_size_group_add_widget(commands.size_group, commands.add_button);
     bbbm_dialogs_attach_add_command_button(GTK_TABLE(commands.table), commands.add_button, i + 1);
@@ -536,13 +537,13 @@ static inline void bbbm_dialogs_reattach_add_command_button(GtkTable *table, Gtk
     g_object_unref(add_button);
 }
 
-static void bbbm_dialogs_delete_command(GtkWidget *widget, GdkEvent *event, struct BBBMCommandList *commands) {
+static void bbbm_dialogs_delete_command(GtkButton *button, struct BBBMCommandList *commands) {
     gint index;
     guint i;
     GtkWidget *label_entry, *command_entry, *delete_button;
     GList *label_iterator, *command_iterator, *button_iterator;
 
-    index = g_list_index(commands->delete_buttons, widget);
+    index = g_list_index(commands->delete_buttons, button);
     g_return_if_fail(index >= 0);
 
     label_entry   = g_list_nth_data(commands->label_entries,   index);
@@ -591,7 +592,7 @@ static void bbbm_dialogs_delete_command(GtkWidget *widget, GdkEvent *event, stru
     gtk_table_resize(GTK_TABLE(commands->table), commands->command_count + 2, 3);
 }
 
-static void bbbm_dialogs_add_command(GtkWidget *widget, GdkEvent *event, struct BBBMCommandList *commands) {
+static void bbbm_dialogs_add_command(GtkButton *button, struct BBBMCommandList *commands) {
     GtkWidget *label_entry, *command_entry, *delete_button;
     GtkAdjustment *adjustment;
     guint index;
@@ -602,8 +603,7 @@ static void bbbm_dialogs_add_command(GtkWidget *widget, GdkEvent *event, struct 
     command_entry = gtk_entry_new();
     commands->command_entries = g_list_append(commands->command_entries, command_entry);
 
-    delete_button = gtk_button_new();
-    gtk_button_set_image(GTK_BUTTON(delete_button), gtk_image_new_from_stock(GTK_STOCK_DELETE, GTK_ICON_SIZE_BUTTON));
+    delete_button = bbbm_dialogs_create_button(GTK_STOCK_DELETE);
     g_signal_connect(GTK_OBJECT(delete_button), "clicked", G_CALLBACK(bbbm_dialogs_delete_command), commands);
     commands->delete_buttons = g_list_append(commands->delete_buttons, delete_button);
     gtk_size_group_add_widget(commands->size_group, delete_button);
@@ -622,4 +622,18 @@ static void bbbm_dialogs_add_command(GtkWidget *widget, GdkEvent *event, struct 
 
     adjustment = gtk_scrolled_window_get_vadjustment(GTK_SCROLLED_WINDOW(commands->scrolled_window));
     gtk_adjustment_set_value(adjustment, adjustment->upper);
+}
+
+static GtkWidget *bbbm_dialogs_create_button(const gchar *stock_id) {
+    GtkWidget *button;
+
+    button = gtk_button_new();
+#if HAVE_GTK_BUTTON_SET_IMAGE == 0
+    g_debug("gtk_button_set_image is not available, using gtk_container_add instead");
+    gtk_container_add(GTK_CONTAINER(button), gtk_image_new_from_stock(stock_id, GTK_ICON_SIZE_BUTTON));
+#else
+    g_debug("gtk_button_set_image is available, using it");
+    gtk_button_set_image(GTK_BUTTON(button), gtk_image_new_from_stock(stock_id, GTK_ICON_SIZE_BUTTON));
+#endif
+    return button;
 }

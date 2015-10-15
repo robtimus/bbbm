@@ -24,6 +24,7 @@
 #include "image.h"
 #include "bbbm.h"
 #include "util.h"
+#include "compat.h"
 
 static void bbbm_image_class_init(BBBMImageClass *klass);
 static void bbbm_image_init(BBBMImage *image);

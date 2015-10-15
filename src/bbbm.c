@@ -31,6 +31,7 @@
 #include "dialogs.h"
 #include "options.h"
 #include "util.h"
+#include "compat.h"
 
 #define PADDING  5
 

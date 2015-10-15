@@ -26,6 +26,7 @@
 #include "config.h"
 #include "options.h"
 #include "util.h"
+#include "compat.h"
 
 #if HAVE_STRTOLD == 1
     #define BBBM_STRTOD(nptr, endptr)  strtold(nptr, endptr)
@@ -46,6 +47,10 @@
 
 typedef struct {
     BBBMOptions *options;
+#if HAVE_G_MARKUP_PARSE_CONTEXT_GET_ELEMENT_STACK == 0
+    /* the stack of element names */
+    GSList *element_stack;
+#endif
     /* the stack of text data for the current element stack */
     GSList *text_stack;
     /* the command and command label for the current bbbm/commands/command element; reset each time */
@@ -129,6 +134,7 @@ BBBMOptions *bbbm_options_read_from_file(const gchar *filename) {
     gchar contents[BBBM_OPTIONS_READ_BUFFER_SIZE];
     gint len;
 
+    GMarkupParseFlags parser_flags;
     GMarkupParser parser;
     GMarkupParseContext *context;
     GError *error = NULL;
@@ -144,6 +150,16 @@ BBBMOptions *bbbm_options_read_from_file(const gchar *filename) {
         return NULL;
     }
 
+    parser_flags = 0;
+#if HAVE_G_MARKUP_PREFIX_ERROR_POSITION != 0
+    g_debug("enabling parse flag G_MARKUP_PREFIX_ERROR_POSITION");
+    parser_flags |= G_MARKUP_PREFIX_ERROR_POSITION;
+#endif
+#if HAVE_G_MARKUP_TREAT_CDATA_AS_TEXT != 0
+    g_debug("enabling parse flag G_MARKUP_TREAT_CDATA_AS_TEXT");
+    parser_flags |= G_MARKUP_TREAT_CDATA_AS_TEXT;
+#endif
+
     parser.start_element = bbbm_options_parse_start_element;
     parser.end_element   = bbbm_options_parse_end_element;
     parser.text          = bbbm_options_parse_text;
@@ -155,6 +171,10 @@ BBBMOptions *bbbm_options_read_from_file(const gchar *filename) {
     options->commands    = NULL;
 
     parse_data.options                  = options;
+#if HAVE_G_MARKUP_PARSE_CONTEXT_GET_ELEMENT_STACK == 0
+    g_debug("g_markup_parse_context_get_element_stack is not available, using custom element stack");
+    parse_data.element_stack            = NULL;  /* empty stack */
+#endif
     parse_data.text_stack               = NULL;  /* empty stack */
     parse_data.command                  = NULL;  /* no command */;
     parse_data.command_label            = NULL;  /* no command label */
@@ -169,7 +189,7 @@ BBBMOptions *bbbm_options_read_from_file(const gchar *filename) {
     parse_data.found_command            = FALSE; /* bbbm/commands/command/command */
     parse_data.found_command_label      = FALSE; /* bbbm/commands/command/label */
 
-    context = g_markup_parse_context_new(&parser, G_MARKUP_PREFIX_ERROR_POSITION, &parse_data, NULL);
+    context = g_markup_parse_context_new(&parser, parser_flags, &parse_data, NULL);
     while ((len = fread(contents, sizeof(gchar), BBBM_OPTIONS_READ_BUFFER_SIZE, file)) != 0) {
 
         if (!g_markup_parse_context_parse(context, contents, len, &error)) {
@@ -438,7 +458,8 @@ void bbbm_options_add_command(BBBMOptions *options, const gchar *command, const 
 void bbbm_options_destroy(BBBMOptions *options) {
     g_return_if_fail(options != NULL);
     g_free(options->set_command);
-    g_list_free_full(options->commands, (GDestroyNotify) bbbm_command_destroy);
+    g_list_foreach(options->commands, (GFunc) bbbm_command_destroy, NULL);
+    g_list_free(options->commands);
     g_free(options);
 }
 
@@ -462,15 +483,21 @@ static void bbbm_options_parse_start_element(GMarkupParseContext *context,
                                              gpointer user_data,
                                              GError **error) {
 
+    BBBMOptionsParseData *parse_data;
     const GSList *element_stack;
     guint depth;
     const gchar *parent_element_name;
-    BBBMOptionsParseData *parse_data;
-
-    element_stack = g_markup_parse_context_get_element_stack(context);
-    depth = g_slist_length((GSList *) element_stack);
 
     parse_data = (BBBMOptionsParseData *) user_data;
+
+#if HAVE_G_MARKUP_PARSE_CONTEXT_GET_ELEMENT_STACK == 0
+    g_debug("pushing element name '%s'", element_name);
+    parse_data->element_stack = g_slist_prepend(parse_data->element_stack, element_name);
+    element_stack = parse_data->element_stack;
+#else
+    element_stack = g_markup_parse_context_get_element_stack(context);
+#endif
+    depth = g_slist_length((GSList *) element_stack);
 
     g_debug("found start element '%s'", element_name);
 
@@ -660,16 +687,20 @@ static void bbbm_options_parse_end_element(GMarkupParseContext *context,
                                            gpointer user_data,
                                            GError **error) {
 
+    BBBMOptionsParseData *parse_data;
     const GSList *element_stack;
     guint depth;
     const gchar *parent_element_name;
-    BBBMOptionsParseData *parse_data;
     GString *text;
 
-    element_stack = g_markup_parse_context_get_element_stack(context);
-    depth = g_slist_length((GSList *) element_stack);
-
     parse_data = (BBBMOptionsParseData *) user_data;
+
+#if HAVE_G_MARKUP_PARSE_CONTEXT_GET_ELEMENT_STACK == 0
+    element_stack = parse_data->element_stack;
+#else
+    element_stack = g_markup_parse_context_get_element_stack(context);
+#endif
+    depth = g_slist_length((GSList *) element_stack);
 
     /* get then pop the first element */
     text = (GString *) parse_data->text_stack->data;
@@ -760,6 +791,12 @@ static void bbbm_options_parse_end_element(GMarkupParseContext *context,
             }
             break;
     }
+
+#if HAVE_G_MARKUP_PARSE_CONTEXT_GET_ELEMENT_STACK == 0
+    g_debug("popping element name '%s'", parse_data->element_stack->data);
+    parse_data->element_stack->data = NULL;
+    parse_data->element_stack = g_slist_delete_link(parse_data->element_stack, parse_data->element_stack);
+#endif
 
     if (text != NULL) {
         g_string_free(text, TRUE);
@@ -925,7 +962,13 @@ static inline void bbbm_options_parse_invalid_attribute(GError **error, const gc
 }
 
 static inline void bbbm_options_parse_missing_attribute(GError **error, const gchar *element_name, const gchar *name) {
-    g_set_error(error, G_MARKUP_ERROR, G_MARKUP_ERROR_MISSING_ATTRIBUTE,
+#if HAVE_G_MARKUP_ERROR_MISSING_ATTRIBUTE == 0
+    const gint error_code = G_MARKUP_ERROR_PARSE;
+    g_debug("G_MARKUP_ERROR_MISSING_ATTRIBUTE is not supported, using G_MARKUP_ERROR_PARSE instead");
+#else
+    const gint error_code = G_MARKUP_ERROR_MISSING_ATTRIBUTE;
+#endif
+    g_set_error(error, G_MARKUP_ERROR, error_code,
                 "Attribute '%s' must appear on element '%s'",
                 name, element_name);
 }

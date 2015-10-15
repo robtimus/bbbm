@@ -1,3 +1,7 @@
+2015-10-15  rob.spoor  <bbbm@icemanx.nl>
+
+	Added support for older gtk+-2.0 versions
+
 2015-10-14  rob.spoor  <bbbm@icemanx.nl>
 
 	Enabled the migration tool to support both Python 2 and 3

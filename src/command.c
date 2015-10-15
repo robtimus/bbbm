@@ -21,6 +21,7 @@
 #include <glib.h>
 #include "command.h"
 #include "util.h"
+#include "compat.h"
 
 BBBMCommand *bbbm_command_new(const gchar *command, const gchar *label) {
     BBBMCommand *cmd;
