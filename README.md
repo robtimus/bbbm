@@ -7,7 +7,7 @@ backgrounds, or a Blackbox background submenu.
 
 What are the sytem requirements ?
 =================================
-* gtk+-2.0 or up.
+* gtk+-2.0 (any version).
 * gcc, pkg-config and gtk+ development package for compiling.
 
 Although the name would suggest that Blackbox is needed, any command to set the
