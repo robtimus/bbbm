@@ -3,4 +3,6 @@ TODO list
 
 - Add support for translations (gettext)
 
+- Add drag&drop support for adding and reordering images
+
 - Optionally store the last location, size and window state
