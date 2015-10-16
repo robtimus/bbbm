@@ -203,7 +203,12 @@ static inline GtkWidget *bbbm_create_menubar(BBBM *bbbm) {
 }
 
 void bbbm_destroy(BBBM *bbbm) {
-    /* closing the window already destroyed all fields */
+    /* options and config_file are not owned by the instance, do not destroy them */
+    g_free(bbbm->filename);
+    g_list_foreach(bbbm->images, (GFunc) g_object_unref, NULL);
+    g_list_free(bbbm->images);
+    /* closing the window already destroyed the window, table and status bars */
+    g_object_unref(bbbm->factory);
     g_free(bbbm);
 }
 
@@ -555,6 +560,7 @@ static void bbbm_image_popup_delete(BBBMImage *image) {
         index = g_list_index(bbbm->images, image);
         bbbm->images = g_list_remove(bbbm->images, image);
         gtk_widget_destroy(GTK_WIDGET(image));
+        g_object_unref(image);
         if (index != g_list_length(bbbm->images)) {
             bbbm_reset_images(bbbm, index);
         }

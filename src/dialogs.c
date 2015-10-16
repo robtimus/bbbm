@@ -434,6 +434,11 @@ guint bbbm_dialogs_options(GtkWindow *parent, BBBMOptions *options) {
         }
     }
     gtk_widget_destroy(dialog);
+    g_object_unref(size_group);
+    g_object_unref(commands.size_group);
+    g_list_free(commands.label_entries);
+    g_list_free(commands.command_entries);
+    g_list_free(commands.delete_buttons);
 
     return result;
 }

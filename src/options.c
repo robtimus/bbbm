@@ -417,7 +417,7 @@ gboolean bbbm_options_set_command_count(BBBMOptions *options, const guint comman
         GList *last;
 
         last = g_list_last(options->commands);
-        g_free(last->data);
+        bbbm_command_destroy(last->data);
         options->commands = g_list_delete_link(options->commands, last);
         current_count--;
         result = TRUE;
@@ -774,6 +774,8 @@ static void bbbm_options_parse_end_element(GMarkupParseContext *context,
                     if (!bbbm_str_empty(parse_data->command) || !bbbm_str_empty(parse_data->command_label)) {
                         bbbm_options_add_command(parse_data->options, parse_data->command, parse_data->command_label);
                     }
+                    g_free(parse_data->command);
+                    g_free(parse_data->command_label);
                     parse_data->command = NULL;
                     parse_data->command_label = NULL;
                 }
