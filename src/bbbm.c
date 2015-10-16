@@ -519,7 +519,7 @@ static void bbbm_image_popup_edit_description(BBBMImage *image) {
 
     old_description = bbbm_image_get_description(image);
     new_description = bbbm_dialogs_edit_description(GTK_WINDOW(image->bbbm->window), old_description);
-    if (!bbbm_str_equals(new_description, old_description)) {
+    if (new_description != NULL && !bbbm_str_equals(new_description, old_description)) {
         /* Normally we would call bbbm_image_set_description.
            However, why do duplicate new_description only to free it? */
         bbbm_image_set_description_ref(image, new_description);
