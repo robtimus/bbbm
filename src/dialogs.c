@@ -33,6 +33,7 @@
 #define OPTION_LABEL_ALIGN_Y   0.5
 
 struct BBBMCommandList {
+    GtkWindow *parent_window;
     guint command_count;
     GtkWidget *table;
     GtkWidget *scrolled_window;
@@ -323,6 +324,7 @@ guint bbbm_dialogs_options(GtkWindow *parent, BBBMOptions *options) {
 
     /* Commands tab */
     label = gtk_label_new("Commands");
+    commands.parent_window   = parent;
     commands.command_count   = bbbm_options_get_command_count(options);
     commands.table           = gtk_table_new(commands.command_count + 2, 3, FALSE);
     commands.scrolled_window = gtk_scrolled_window_new(NULL, NULL);
@@ -546,6 +548,7 @@ static void bbbm_dialogs_delete_command(GtkButton *button, struct BBBMCommandLis
     gint index;
     guint i;
     GtkWidget *label_entry, *command_entry, *delete_button;
+    const gchar *identifier;
     GList *label_iterator, *command_iterator, *button_iterator;
 
     index = g_list_index(commands->delete_buttons, button);
@@ -555,46 +558,56 @@ static void bbbm_dialogs_delete_command(GtkButton *button, struct BBBMCommandLis
     command_entry = g_list_nth_data(commands->command_entries, index);
     delete_button = g_list_nth_data(commands->delete_buttons,  index);
 
-    commands->label_entries   = g_list_remove(commands->label_entries,   label_entry);
-    commands->command_entries = g_list_remove(commands->command_entries, command_entry);
-    commands->delete_buttons  = g_list_remove(commands->delete_buttons,  delete_button);
-
-    gtk_widget_destroy(label_entry);
-    gtk_widget_destroy(command_entry);
-    gtk_widget_destroy(delete_button);
-
-    commands->command_count--;
-
-    for (i = index,
-         label_iterator   = g_list_nth(commands->label_entries, index),
-         command_iterator = g_list_nth(commands->command_entries, index),
-         button_iterator  = g_list_nth(commands->delete_buttons, index);
-
-         label_iterator != NULL && command_iterator != NULL && button_iterator != NULL;
-
-         label_iterator   = label_iterator->next,
-         command_iterator = command_iterator->next,
-         button_iterator  = button_iterator->next,
-         i++) {
-
-        label_entry   = GTK_WIDGET(g_object_ref(label_iterator->data));
-        command_entry = GTK_WIDGET(g_object_ref(command_iterator->data));
-        delete_button = GTK_WIDGET(g_object_ref(button_iterator->data));
-
-        gtk_container_remove(GTK_CONTAINER(commands->table), label_entry);
-        gtk_container_remove(GTK_CONTAINER(commands->table), command_entry);
-        gtk_container_remove(GTK_CONTAINER(commands->table), delete_button);
-
-        bbbm_dialogs_attach_command_widgets(GTK_TABLE(commands->table), label_entry, command_entry, delete_button, i + 1);
-
-        g_object_unref(label_entry);
-        g_object_unref(command_entry);
-        g_object_unref(delete_button);
+    identifier = gtk_entry_get_text(GTK_ENTRY(label_entry));
+    if (bbbm_str_empty(identifier)) {
+        identifier = gtk_entry_get_text(GTK_ENTRY(command_entry));
     }
 
-    bbbm_dialogs_reattach_add_command_button(GTK_TABLE(commands->table), commands->add_button, i + 1);
+    /* always allow deleting empty rows, otherwise ask first */
+    if (bbbm_str_empty(identifier)
+        || bbbm_dialogs_question(commands->parent_window, "Delete Command?", "Delete command '%s'?", identifier)) {
 
-    gtk_table_resize(GTK_TABLE(commands->table), commands->command_count + 2, 3);
+        commands->label_entries   = g_list_remove(commands->label_entries,   label_entry);
+        commands->command_entries = g_list_remove(commands->command_entries, command_entry);
+        commands->delete_buttons  = g_list_remove(commands->delete_buttons,  delete_button);
+
+        gtk_widget_destroy(label_entry);
+        gtk_widget_destroy(command_entry);
+        gtk_widget_destroy(delete_button);
+
+        commands->command_count--;
+
+        for (i = index,
+             label_iterator   = g_list_nth(commands->label_entries, index),
+             command_iterator = g_list_nth(commands->command_entries, index),
+             button_iterator  = g_list_nth(commands->delete_buttons, index);
+
+             label_iterator != NULL && command_iterator != NULL && button_iterator != NULL;
+
+             label_iterator   = label_iterator->next,
+             command_iterator = command_iterator->next,
+             button_iterator  = button_iterator->next,
+             i++) {
+
+            label_entry   = GTK_WIDGET(g_object_ref(label_iterator->data));
+            command_entry = GTK_WIDGET(g_object_ref(command_iterator->data));
+            delete_button = GTK_WIDGET(g_object_ref(button_iterator->data));
+
+            gtk_container_remove(GTK_CONTAINER(commands->table), label_entry);
+            gtk_container_remove(GTK_CONTAINER(commands->table), command_entry);
+            gtk_container_remove(GTK_CONTAINER(commands->table), delete_button);
+
+            bbbm_dialogs_attach_command_widgets(GTK_TABLE(commands->table), label_entry, command_entry, delete_button, i + 1);
+
+            g_object_unref(label_entry);
+            g_object_unref(command_entry);
+            g_object_unref(delete_button);
+        }
+
+        bbbm_dialogs_reattach_add_command_button(GTK_TABLE(commands->table), commands->add_button, i + 1);
+
+        gtk_table_resize(GTK_TABLE(commands->table), commands->command_count + 2, 3);
+    }
 }
 
 static void bbbm_dialogs_add_command(GtkButton *button, struct BBBMCommandList *commands) {
