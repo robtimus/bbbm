@@ -1,7 +1,7 @@
 bbbm ChangeLog
 ----------------------------------------
 
-0.8 (2015-xx-xx)
+0.8 (2015-10-16)
 ----------------
  - Moved from SourceForge to GitHub.
  - The build process has been changed to use ./configure.
